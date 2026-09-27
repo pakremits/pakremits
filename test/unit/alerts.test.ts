@@ -275,6 +275,7 @@ describe('message composition', () => {
     expect(message.text).toContain('/alerts/unsubscribe/')
     expect(message.text).toContain('/alerts/manage/')
     expect(message.html).toContain('Pak<span style="color:#e0a513">Remits</span>')
+    expect(message.html).toContain('>Visit PakRemits</a>')
     expect(message.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
     expect(message.html).toContain('Unsubscribe from this alert</a>')
   })
@@ -312,6 +313,7 @@ describe('message composition', () => {
     expect(message.text).toContain('/alerts/confirm/')
     expect(message.text).toContain('deleted automatically')
     expect(message.text).toContain('/alerts/unsubscribe/')
+    expect(message.html).toContain('Pak<span style="color:#e0a513">Remits</span>')
     expect(message.html).toContain('Unsubscribe from this alert</a>')
     expect(message.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
   })
@@ -325,6 +327,7 @@ describe('message composition', () => {
       token: 'z'.repeat(43),
     })
     expect(message.text).toContain('/alerts/unsubscribe/')
+    expect(message.html).toContain('Pak<span style="color:#e0a513">Remits</span>')
     expect(message.html).toContain('Unsubscribe from this alert</a>')
     expect(message.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
   })
