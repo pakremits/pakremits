@@ -7,19 +7,30 @@
 export const en = {
   nav: {
     compare: 'Compare',
-    alerts: 'Rate alerts',
+    services: 'Services',
+    // Home sections listed only in the phone menu.
+    example: "Today's example",
+    trust: 'Why trust us',
+    whyUs: "Why we're different",
+    receive: 'Ways to receive',
     corridors: 'Corridors',
     howWeRank: 'How we rank',
     faq: 'FAQ',
     setAlert: 'Set a rate alert',
+    /** The header button that opens the rate alert dialog. */
+    rateAlert: 'Rate alert',
     main: 'Main',
     openMenu: 'Open menu',
     closeMenu: 'Close menu',
     themeDark: 'Switch to dark mode',
     themeLight: 'Switch to light mode',
+    appearance: 'Appearance',
   },
 
   home: {
+    // Tooltip on the hero map's Pakistan marker, where every corridor lands.
+    heroHomeLabel: 'Pakistan',
+    heroHomeDetail: 'Home · {count} corridors land here',
     heroTitle: 'Send more rupees home. Same money.',
     heroLede:
       'Compare every major service sending to Pakistan, ranked by the exact amount that lands ' +
@@ -49,6 +60,38 @@ export const en = {
     bestToday: 'Best today',
     whyTitle: 'Why our ranking looks different from other <br></br>comparison sites',
     faqTitle: 'Common questions',
+
+    // Today's example: one real comparison, shown as rupees received.
+    exampleTitle: 'What {amount} turns into today',
+    exampleRoute: 'From {country} to a bank account in Pakistan.',
+    exampleGapBank:
+      'more arrives through the best service than through a typical bank, for the same {amount}.',
+    exampleGapSpread:
+      'more arrives through the best service than through the lowest-paying one, for the same ' +
+      '{amount}.',
+    exampleListLabel: 'Rupees received, from quotes captured at {time} PKT',
+    exampleBest: 'Most rupees',
+    exampleBank: 'Typical bank',
+    exampleGapMark: '{amount} lost',
+    exampleCta: 'Compare your amount',
+
+    providersTitle: 'The services we compare',
+    providersLede:
+      '{count} services, each checked every {minutes} minutes. Open one to see its fees, speed ' +
+      'and payout options.',
+    providersAll: 'See what each service supports',
+
+    payoutTitle: 'How will they receive it?',
+    payoutLede:
+      'Choose how your family gets the money. Each way has its own services, rates and limits.',
+    payoutBank: 'Any Pakistani bank account, paid to the recipient’s IBAN.',
+    payoutJazzcash: 'Straight into the JazzCash wallet on their mobile number.',
+    payoutEasypaisa: 'Straight into the Easypaisa wallet on their mobile number.',
+    payoutNeobank: 'Sent as a bank deposit to their SadaPay or NayaPay account.',
+    payoutCash: 'Collected in person at a pickup point, with their CNIC.',
+    payoutRda: 'For Pakistanis abroad who hold a Roshan Digital Account.',
+
+    alertChartLabel: '{currency} to PKR, last 30 days',
 
     statComparedBody:
       'Services compared on this corridor. We add providers only where we can get a live quote ' +
@@ -147,6 +190,7 @@ export const en = {
     // Sits beside every statistic on the page.
     howWeCount: 'How we count this',
     stripLabel: 'What we can show you, from our own data',
+    proofCountries: '{countries} sending countries and {payouts} ways to receive, in one comparison.',
   },
 
   alerts: {
@@ -197,6 +241,9 @@ export const en = {
     noQuotesYet: 'No quotes yet',
     stale: 'stale',
     deliversThisWay: '{count} providers deliver this way',
+    viewAs: 'Layout',
+    viewList: 'List view',
+    viewGrid: 'Grid view',
     sortBy: 'Sort by',
     sortReceived: 'Most rupees',
     sortFastest: 'Fastest',
@@ -252,6 +299,13 @@ export const en = {
     receiveCurrency: 'Recipient currency',
     amountIn: 'Amount in {currency}',
     compareShort: 'Compare',
+    // The switch on the currency next to the amount: code (USD) or symbol ($).
+    currencyDisplay: 'Show currency as',
+    // Announced while the Compare button waits for results.
+    comparing: 'Comparing rates…',
+    // The compare page's phone summary bar, which opens the search in a sheet.
+    editSearch: 'Change search: {summary}',
+    closeSearch: 'Close search',
     recipientGetsShort: 'Recipient gets',
   },
 

@@ -25,7 +25,15 @@ export const ur: Messages = {
     // TODO: native review
     compare: 'موازنہ',
     // TODO: native review
-    alerts: 'ریٹ الرٹ',
+    services: 'سروسز',
+    // TODO: native review — home sections listed only in the phone menu
+    example: 'آج کی مثال',
+    // TODO: native review
+    trust: 'ہم پر بھروسہ کیوں',
+    // TODO: native review
+    whyUs: 'ہم مختلف کیوں ہیں',
+    // TODO: native review
+    receive: 'رقم وصول کرنے کے طریقے',
     // TODO: native review
     corridors: 'ممالک',
     // TODO: native review — "how we rank" as a section title
@@ -34,6 +42,8 @@ export const ur: Messages = {
     faq: 'عام سوالات',
     // TODO: native review
     setAlert: 'ریٹ الرٹ لگائیں',
+    // TODO: native review — header button that opens the rate alert dialog
+    rateAlert: 'ریٹ الرٹ',
     // TODO: native review — accessibility label for the main nav
     main: 'مرکزی',
     // TODO: native review — accessibility label on the mobile menu button
@@ -44,9 +54,13 @@ export const ur: Messages = {
     themeDark: 'ڈارک موڈ پر جائیں',
     // TODO: native review
     themeLight: 'لائٹ موڈ پر جائیں',
+    appearance: 'ظاہری انداز',
   },
 
   home: {
+    // TODO: native review — tooltip on the hero map's Pakistan marker
+    heroHomeLabel: 'پاکستان',
+    heroHomeDetail: 'گھر · {count} ممالک سے رقم یہاں پہنچتی ہے',
     // TODO: native review — headline; should feel punchy, not literal
     heroTitle: 'وہی رقم، زیادہ روپے',
     // TODO: native review
@@ -97,6 +111,37 @@ export const ur: Messages = {
     whyTitle: 'ہماری درجہ بندی دوسری ویب سائٹس سے مختلف کیوں ہے',
     // TODO: native review
     faqTitle: 'عام سوالات',
+
+    exampleTitle: '{amount} آج کتنے روپے بنتے ہیں',
+    exampleRoute: '{country} سے پاکستان کے بینک اکاؤنٹ میں۔',
+    exampleGapBank:
+      'اتنے ہی {amount} پر، عام بینک کے مقابلے میں بہترین سروس سے اتنے زیادہ روپے پہنچتے ہیں۔',
+    exampleGapSpread:
+      'اتنے ہی {amount} پر، سب سے کم دینے والی سروس کے مقابلے میں بہترین سروس سے اتنے زیادہ روپے ' +
+      'پہنچتے ہیں۔',
+    exampleListLabel: 'وصول ہونے والے روپے، {time} PKT کے ریٹ کے مطابق',
+    exampleBest: 'سب سے زیادہ روپے',
+    exampleBank: 'عام بینک',
+    exampleGapMark: '{amount} کا نقصان',
+    exampleCta: 'اپنی رقم کا موازنہ کریں',
+
+    providersTitle: 'جن سروسز کا ہم موازنہ کرتے ہیں',
+    providersLede:
+      '{count} سروسز، ہر {minutes} منٹ بعد چیک کی جاتی ہیں۔ فیس، رفتار اور وصولی کے طریقے ' +
+      'دیکھنے کے لیے کسی ایک کو کھولیں۔',
+    providersAll: 'دیکھیں ہر سروس کیا سپورٹ کرتی ہے',
+
+    payoutTitle: 'انہیں رقم کیسے ملے گی؟',
+    payoutLede:
+      'چنیں کہ آپ کے گھر والوں کو پیسے کیسے ملیں۔ ہر طریقے کی اپنی سروسز، ریٹ اور حدیں ہیں۔',
+    payoutBank: 'پاکستان کا کوئی بھی بینک اکاؤنٹ، وصول کنندہ کے IBAN پر۔',
+    payoutJazzcash: 'سیدھا ان کے موبائل نمبر والے JazzCash والٹ میں۔',
+    payoutEasypaisa: 'سیدھا ان کے موبائل نمبر والے Easypaisa والٹ میں۔',
+    payoutNeobank: 'ان کے SadaPay یا NayaPay اکاؤنٹ میں بینک ڈپازٹ کے طور پر۔',
+    payoutCash: 'شناختی کارڈ دکھا کر کسی پک اپ پوائنٹ سے نقد وصولی۔',
+    payoutRda: 'بیرونِ ملک مقیم پاکستانیوں کے لیے جن کا روشن ڈیجیٹل اکاؤنٹ ہے۔',
+
+    alertChartLabel: '{currency} سے PKR، پچھلے 30 دن',
 
     // TODO: native review
     statComparedBody:
@@ -235,6 +280,7 @@ export const ur: Messages = {
     howWeCount: 'ہم اسے کیسے شمار کرتے ہیں',
     // TODO: native review
     stripLabel: 'ہمارے اپنے ڈیٹا سے جو ہم دکھا سکتے ہیں',
+    proofCountries: '{countries} ممالک سے بھیجنے اور {payouts} طریقوں سے وصولی، ایک ہی موازنے میں۔',
   },
 
   alerts: {
@@ -314,6 +360,12 @@ export const ur: Messages = {
     stale: 'پرانا',
     // TODO: native review
     deliversThisWay: '{count} سروسز اس طریقے سے بھیجتی ہیں',
+    // TODO: native review
+    viewAs: 'ترتیبِ نمائش',
+    // TODO: native review
+    viewList: 'فہرست',
+    // TODO: native review
+    viewGrid: 'گرڈ',
     // TODO: native review
     sortBy: 'ترتیب',
     // TODO: native review
@@ -404,6 +456,14 @@ export const ur: Messages = {
     amountIn: 'رقم {currency} میں',
     // TODO: native review
     compareShort: 'موازنہ کریں',
+    // TODO: native review — switch between currency code (USD) and symbol ($)
+    currencyDisplay: 'کرنسی ایسے دکھائیں',
+    // TODO: native review — announced while the Compare button waits for results
+    comparing: 'ریٹس کا موازنہ ہو رہا ہے…',
+    // TODO: native review — phone summary bar that opens the search sheet
+    editSearch: 'تلاش تبدیل کریں: {summary}',
+    // TODO: native review
+    closeSearch: 'تلاش بند کریں',
     // TODO: native review
     recipientGetsShort: 'وصول کنندہ کو ملے',
   },

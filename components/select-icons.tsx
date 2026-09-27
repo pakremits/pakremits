@@ -44,6 +44,21 @@ export function CountryFlag({ countryCode }: { countryCode: string }) {
     )
   }
 
+  // The receiving side: the compare page's phone summary shows USD → PKR with both flags.
+  if (countryCode === 'PK') {
+    return (
+      <svg viewBox="0 0 28 20" className={flagClass} aria-hidden="true">
+        <rect width="28" height="20" fill="#01411C" />
+        <rect width="7" height="20" fill="#fff" />
+        <path
+          fill="#fff"
+          d="M22.4 13.9a5 5 0 1 1-1.2-8.6 4.1 4.1 0 1 0 1.2 8.6z"
+        />
+        <path fill="#fff" d="m21.6 6.1.5 1.4h1.5l-1.2.9.4 1.4-1.2-.9-1.2.9.4-1.4-1.2-.9h1.5z" />
+      </svg>
+    )
+  }
+
   if (countryCode === 'US') {
     return (
       <svg viewBox="0 0 28 20" className={flagClass} aria-hidden="true">

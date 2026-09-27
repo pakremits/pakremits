@@ -4,15 +4,25 @@ import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { CompareSearch } from '@/components/compare-search'
 import { CorridorHero } from '@/components/corridor-hero'
 import { SiteFooter, SiteHeader } from '@/components/site-chrome'
-import { CORRIDORS, defaultAmountFor } from '@/lib/corridors'
-import { getBestRatePerCorridor, getMidMarketSeries } from '@/lib/quotes'
+import { eq } from 'drizzle-orm'
+import { CORRIDORS, CURRENCY_SYMBOLS, defaultAmountFor, formatSend } from '@/lib/corridors'
+import { getBestRatePerCorridor, getComparison, getMidMarketSeries } from '@/lib/quotes'
+import { db } from '@/lib/db'
+import { providers as providersTable } from '@/lib/db/schema'
 import type { SendCurrency } from '@/lib/db/schema'
 import { notFound } from 'next/navigation'
-import { alternatesFor, isLocale } from '@/i18n/routing'
+import { alternatesFor, isLocale, localePath } from '@/i18n/routing'
 import { corridorPath } from '@/lib/routes'
 import { RateAlertCta } from '@/components/rate-alert-cta'
 import { RateMarquee } from '@/components/rate-marquee'
 import { CountryFlag } from '@/components/select-icons'
+import { PayoutGuide } from '@/components/payout-guide'
+import { PROOF_CARD, ProofStrip } from '@/components/proof-strip'
+import { ProviderRoster, type RosterProvider } from '@/components/provider-roster'
+import { RateChart } from '@/components/rate-chart'
+import { TodaysExample } from '@/components/todays-example'
+import { PAYOUT_OPTIONS } from '@/lib/payout'
+import { getProofStats } from '@/lib/proof/stats'
 import { CLAIM_FIRST_PAKISTAN_ONLY_SITE } from '@/lib/proof/config'
 import { publicPageMetadata } from '@/lib/seo'
 
@@ -46,6 +56,36 @@ const HERO_ORIGINS: Record<string, { lon: number; lat: number }> = {
   canada: { lon: -79.4, lat: 43.7 },
   eurozone: { lon: 10, lat: 51 },
   australia: { lon: 151.2, lat: -33.9 },
+}
+
+/**
+ * The hero form opens on $1,000 from the USA, and the worked example, payout
+ * guide and chart follow it. 1,000 is one of USD's standard amounts, so the
+ * example always has fresh quotes.
+ */
+const EXAMPLE_CORRIDOR = CORRIDORS.find((corridor) => corridor.slug === 'usa') ?? CORRIDORS[0]
+const EXAMPLE_AMOUNT = 1000
+
+/** Active, real providers for the roster. Empty (and the section hidden) if the DB is down. */
+async function listRosterProviders(): Promise<RosterProvider[]> {
+  try {
+    const rows = await db
+      .select({
+        slug: providersTable.slug,
+        name: providersTable.name,
+        brandColor: providersTable.brandColor,
+        brandTextColor: providersTable.brandTextColor,
+        isBenchmark: providersTable.isBenchmark,
+      })
+      .from(providersTable)
+      .where(eq(providersTable.active, true))
+      .orderBy(providersTable.name)
+    return rows.filter((row) => !row.isBenchmark)
+  } catch (error) {
+    // The lazy DB proxy can throw before a promise exists, e.g. with no DATABASE_URL at build.
+    console.error('[home] provider roster failed:', error)
+    return []
+  }
 }
 
 const COUNTRY_BY_CURRENCY = new Map(
@@ -85,12 +125,23 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     { q: t('faq6Q'), a: t('faq6A') },
   ]
 
-  const [chips, series] = await Promise.all([
+  const [chips, series, example, proofStats, rosterProviders, exampleSeries] = await Promise.all([
     getBestRatePerCorridor(),
     // Every corridor currency: the marquee carries a 7-day trend chip per
     // sending country.
     Promise.all(CORRIDORS.map((corridor) => getMidMarketSeries(corridor.fromCurrency, 7))),
+    getComparison({ corridorSlug: EXAMPLE_CORRIDOR.slug, amount: EXAMPLE_AMOUNT }),
+    getProofStats(),
+    listRosterProviders(),
+    getMidMarketSeries(EXAMPLE_CORRIDOR.fromCurrency, 30),
   ])
+
+  const exampleSendLabel = formatSend(CURRENCY_SYMBOLS[EXAMPLE_CORRIDOR.fromCurrency], EXAMPLE_AMOUNT)
+  const exampleCompareHref = `${localePath(locale, '/compare')}?${new URLSearchParams({
+    from: EXAMPLE_CORRIDOR.slug,
+    to: 'bank',
+    amount: String(EXAMPLE_AMOUNT),
+  })}`
 
   const seriesByCurrency = new Map(series.map((entry) => [entry.currency, entry]))
 
@@ -131,7 +182,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       {/* The band is an interactive map of the corridors; hover a country for
           today's best rate, click it to open that corridor. */}
-      <CorridorHero corridors={heroCorridors} className="pt-12 pb-12 sm:pt-20 sm:pb-20">
+      <CorridorHero
+        corridors={heroCorridors}
+        home={{
+          label: t('heroHomeLabel'),
+          detail: t('heroHomeDetail', { count: heroCorridors.length }),
+        }}
+        className="pt-6 pb-[30px] short-phone:pt-4 sm:pt-20">
 
         <div className="relative mx-auto max-w-[980px] px-6 text-center text-white">
           {/* Off by default. See CLAIM_FIRST_PAKISTAN_ONLY_SITE — it must not
@@ -142,18 +199,22 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </p>
           )}
 
-          <h1 className="mx-auto max-w-[20ch] font-hero text-[clamp(36px,5vw,62px)] leading-[1.08] font-bold tracking-[-0.03em]">
+          <h1 className="mx-auto max-w-[20ch] font-hero text-[30px] leading-[1.1] font-bold tracking-[-0.03em] sm:text-[clamp(36px,5vw,62px)] sm:leading-[1.08]">
             {t('heroTitle')}
           </h1>
 
-          <p className="mx-auto mt-5 max-w-[62ch] text-[17px] leading-relaxed text-white/90 sm:text-lg">
+          <p className="mx-auto mt-3 max-w-[62ch] text-[15px] leading-normal text-white/90 short-phone:mt-2 short-phone:text-[14px] sm:mt-5 sm:text-lg sm:leading-relaxed">
             {t('heroLede')}
           </p>
         </div>
 
-        <div id="compare" className="relative z-[2] mx-auto mt-10 max-w-[900px] px-4 sm:mt-14 sm:px-6">
+        <div id="compare" className="relative z-[2] mx-auto mt-6 max-w-[900px] px-4 short-phone:mt-4 sm:mt-14 sm:px-6 lg:mt-[46px]">
           <h2 className="sr-only">{tPanel('heading')}</h2>
-          <CompareSearch corridors={corridorOptions} />
+          <CompareSearch
+            corridors={corridorOptions}
+            initialCorridor={EXAMPLE_CORRIDOR.slug}
+            initialAmount={EXAMPLE_AMOUNT}
+          />
         </div>
       </CorridorHero>
 
@@ -161,7 +222,16 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         {/* Corridor marquee — full-bleed, so it sits outside the column. */}
         <RateMarquee locale={locale} items={marqueeItems} />
 
-        <section className="mt-16" aria-labelledby="trust-cards-title">
+        {/* One real comparison, drawn as rupees received. */}
+        <TodaysExample
+          locale={locale}
+          comparison={example}
+          countryName={EXAMPLE_CORRIDOR.fromCountryName}
+          sendLabel={exampleSendLabel}
+          compareHref={exampleCompareHref}
+        />
+
+        <section id="trust" className="mt-16" aria-labelledby="trust-cards-title">
           <div className="max-w-[54ch]">
             <h2
               id="trust-cards-title"
@@ -225,6 +295,23 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               </li>
             ))}
           </ul>
+
+          {/* The live gap already has its own section above, so it is not repeated here. */}
+          <ProofStrip
+            locale={locale}
+            stats={proofStats}
+            liveGapOnStandardAmount={null}
+            sendAmountLabel={exampleSendLabel}
+          >
+            <li className={PROOF_CARD}>
+              <p className="text-[15px] leading-[1.4] font-medium text-ink">
+                {tProof('proofCountries', {
+                  countries: CORRIDORS.length,
+                  payouts: PAYOUT_OPTIONS.length,
+                })}
+              </p>
+            </li>
+          </ProofStrip>
         </section>
 
         {/* Why our ranking is different */}
@@ -274,6 +361,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </div>
         </section>
 
+        {/* Every service in the comparison. */}
+        <ProviderRoster locale={locale} providers={rosterProviders} />
+
         {/* Corridors. Full-bleed like the marquee, so the dark theme's band
             runs edge to edge; in light the band is transparent and the section
             looks as it always did. */}
@@ -320,13 +410,25 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </div>
         </section>
 
-        {/* Rate alerts, under the corridor picker. Opens the dialog. */}
+        {/* Payout rails, after the country picker: where from, then where to. */}
+        <PayoutGuide locale={locale} corridor={EXAMPLE_CORRIDOR.slug} amount={EXAMPLE_AMOUNT} />
+
+        {/* Rate alerts, with the trend they would be watching. Opens the dialog. */}
         <RateAlertCta
           locale={locale}
           title={tAlerts('dialogTitle')}
           body={tAlerts('ctaBody')}
           button={tNav('setAlert')}
-          className="mt-16"
+          className="mt-24"
+          aside={
+            <RateChart
+              points={exampleSeries.points}
+              currency={EXAMPLE_CORRIDOR.fromCurrency}
+              label={t('alertChartLabel', { currency: EXAMPLE_CORRIDOR.fromCurrency })}
+              height={200}
+              bare
+            />
+          }
         />
 
         {/* FAQ */}

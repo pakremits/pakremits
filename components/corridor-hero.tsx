@@ -2,9 +2,14 @@
 
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { createCorridorScene, type HeroColors, type HeroCorridor } from '@/lib/hero/corridor-scene'
+import {
+  createCorridorScene,
+  type HeroColors,
+  type HeroCorridor,
+  type HeroHome,
+} from '@/lib/hero/corridor-scene'
 
-export type { HeroCorridor }
+export type { HeroCorridor, HeroHome }
 
 /**
  * The home page's green header band, drawn as an interactive world map with
@@ -12,8 +17,8 @@ export type { HeroCorridor }
  *
  * Renders the <header> itself so the whole header can take pointer events: the
  * headline sits above the map, and hovering through it still lights the map.
- * The search card straddles the band's lower edge, so anything inside
- * `#compare` is ignored — typing into the form must never open a corridor.
+ * The search card sits on the band, so anything inside `#compare` is ignored:
+ * typing into the form must never open a corridor.
  *
  * The band's .hero-gradient shows during SSR and before the scene's first frame;
  * the canvas repeats the same three stops per theme so the swap is invisible.
@@ -37,10 +42,13 @@ const serverTheme = () => 'light' as const
 
 export function CorridorHero({
   corridors,
+  home,
   className = '',
   children,
 }: {
   corridors: HeroCorridor[]
+  /** Tooltip for the Pakistan marker. */
+  home?: HeroHome
   className?: string
   children: ReactNode
 }) {
@@ -52,19 +60,21 @@ export function CorridorHero({
 
   // Compared by value, so a re-render with equal data never restarts the scene.
   const corridorsKey = JSON.stringify(corridors)
+  const homeKey = JSON.stringify(home ?? null)
 
   useEffect(() => {
     if (!canvasRef.current || !hostRef.current) return
     const scene = createCorridorScene(canvasRef.current, {
       colors: COLORS[theme],
       corridors: JSON.parse(corridorsKey) as HeroCorridor[],
+      home: (JSON.parse(homeKey) as HeroHome | null) ?? undefined,
       eventTarget: hostRef.current,
       overlay: overlayRef.current,
       ignore: (event) => event.target instanceof Element && event.target.closest('#compare') !== null,
       onCorridorClick: (corridor) => router.push(corridor.href),
     })
     return () => scene.destroy()
-  }, [theme, corridorsKey, router])
+  }, [theme, corridorsKey, homeKey, router])
 
   return (
     <header ref={hostRef} className={`relative ${className}`}>

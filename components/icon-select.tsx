@@ -23,6 +23,8 @@ interface IconSelectProps {
   variant?: 'default' | 'hero'
   /** Hero only: overrides the list's minimum width (full trigger width). */
   listMinWidth?: string
+  /** Default only: every option bold and in full ink, for short values like "USD" / "$". */
+  strongOptions?: boolean
 }
 
 /**
@@ -39,6 +41,7 @@ export function IconSelect({
   className = '',
   variant = 'default',
   listMinWidth = 'min-w-full',
+  strongOptions = false,
 }: IconSelectProps) {
   const hero = variant === 'hero'
   const rootRef = useRef<HTMLDivElement>(null)
@@ -133,7 +136,17 @@ export function IconSelect({
             {selected.icon}
           </span>
         )}
-        <span className="min-w-0 flex-1 truncate">{selected?.selectedLabel ?? selected?.label}</span>
+        {/* A short selectedLabel is for the one-row bar at lg; narrower layouts stack and have room for the full name. */}
+        <span className="min-w-0 flex-1 truncate">
+          {selected?.selectedLabel ? (
+            <>
+              <span className="lg:hidden">{selected.label}</span>
+              <span className="hidden lg:inline">{selected.selectedLabel}</span>
+            </>
+          ) : (
+            selected?.label
+          )}
+        </span>
         <svg
           viewBox="0 0 16 16"
           fill="none"
@@ -184,8 +197,8 @@ export function IconSelect({
                      text-[18px] font-medium text-ink max-sm:gap-3 max-sm:px-3.5 max-sm:py-3 max-sm:text-[16px]
                      ${option.value === value || index === activeIndex ? 'bg-tint' : ''}`
                   : `flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-[15px]
-                     ${index === activeIndex ? 'bg-mist text-ink' : 'text-muted'}
-                     ${option.value === value ? 'font-medium' : ''}`
+                     ${index === activeIndex ? 'bg-mist text-ink' : strongOptions ? 'text-ink' : 'text-muted'}
+                     ${strongOptions ? 'font-bold' : option.value === value ? 'font-medium' : ''}`
               }
             >
               {option.icon && (

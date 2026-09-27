@@ -14,13 +14,24 @@ import { corridorPath, methodPath, ratePath, staticPath } from '@/lib/routes'
 /** Line icons shown before each nav label. Decorative — the label carries the meaning. */
 const NAV_ICONS = {
   compare: 'M20 7H9M20 12H11M20 17H9M8 4 4 7l4 3M8 14l-4 3 4 3',
-  alerts: 'M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0',
+  services: 'M12 3 3 7.5l9 4.5 9-4.5L12 3zM3 12l9 4.5 9-4.5M3 16.5 12 21l9-4.5',
   corridors: 'M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18M3 12a9 9 0 0 0 18 0 9 9 0 0 0-18 0z',
   howWeRank: 'M4 20h16M7 16v-5M12 16V6M17 16v-3',
   faq: 'M9.5 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.8-.9 1.4v.3M12 17h.01M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z',
 } as const
 
+const BELL_ICON = 'M6 9a6 6 0 1 1 12 0c0 4.2 1.4 5.8 2 6.5H4c.6-.7 2-2.3 2-6.5zM10 19a2 2 0 0 0 4 0'
+
+/** Icons for the home sections that only the phone menu links to. */
+const DRAWER_ICONS = {
+  example: 'M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21zM10 8h4M10 12h4M10 16h2',
+  trust: 'M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6zM9 12l2 2 4-4',
+  whyUs: 'M12 4v16M8 20h8M5 7h14M7 7l-3 6a3 3 0 0 0 6 0zM17 7l-3 6a3 3 0 0 0 6 0z',
+  receive: 'M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4zM4 7V5.5A1.5 1.5 0 0 1 5.5 4H16M16 13.5h.01',
+} as const
+
 export type NavKey = keyof typeof NAV_ICONS
+type DrawerKey = NavKey | keyof typeof DRAWER_ICONS
 
 export async function SiteHeader({
   locale = 'en',
@@ -39,11 +50,59 @@ export async function SiteHeader({
       href: active === 'compare' ? localePath(locale, '/compare') : `${localePath(locale, '/')}#compare`,
       label: t('compare'),
     },
-    { key: 'alerts', href: `${localePath(locale, '/')}#alerts`, label: t('alerts') },
+    // The services we compare, on the home page.
+    { key: 'services', href: `${localePath(locale, '/')}#providers`, label: t('services') },
     { key: 'corridors', href: `${localePath(locale, '/')}#corridors`, label: t('corridors') },
     { key: 'howWeRank', href: staticPath('how-we-rank', locale), label: t('howWeRank') },
     { key: 'faq', href: `${localePath(locale, '/')}#faq`, label: t('faq') },
   ]
+
+  // The phone menu has room for every home section, so it lists them in page
+  // order with the bar's five links among them. The desktop bar stays at five.
+  const home = localePath(locale, '/')
+  const byKey = Object.fromEntries(nav.map((item) => [item.key, item]))
+  const drawer: { key: DrawerKey; href: string; label: string }[] = [
+    byKey.compare,
+    { key: 'example', href: `${home}#example`, label: t('example') },
+    { key: 'trust', href: `${home}#trust`, label: t('trust') },
+    { key: 'whyUs', href: `${home}#how`, label: t('whyUs') },
+    byKey.services,
+    byKey.corridors,
+    { key: 'receive', href: `${home}#receive`, label: t('receive') },
+    byKey.howWeRank,
+    byKey.faq,
+  ]
+  const drawerIcon = (key: DrawerKey) =>
+    key in NAV_ICONS ? NAV_ICONS[key as NavKey] : DRAWER_ICONS[key as keyof typeof DRAWER_ICONS]
+
+  const logo = (
+    <>
+      {/* The brand-sheet logo, teal and gold for a white bar. See public/pakrimits-new-logo.svg.
+
+          Plain <img>, not next/image: the source is a static SVG, which the
+          image optimiser passes through untouched anyway and only serves
+          behind `dangerouslyAllowSVG`. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/pakrimits-new-logo.svg"
+        alt="PakRemits"
+        width={185}
+        height={36}
+        className="h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:hidden"
+      />
+      {/* Dark theme: same mark, light wordmark. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/pakrimits-new-logo-dark.svg"
+        alt="PakRemits"
+        width={185}
+        height={36}
+        className="hidden h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:block"
+      />
+    </>
+  )
+
+  const alertHref = `${localePath(locale, '/')}#alerts`
 
   return (
     /* Sticky and fully opaque, so the bar never reads as a tint of whatever
@@ -52,28 +111,7 @@ export async function SiteHeader({
       <div className="mx-auto flex h-[86px] max-w-[1120px] items-center justify-between gap-4 px-6 lg:gap-6">
         <div className="flex min-w-0 items-center gap-5 xl:gap-6">
           <ScrollTopLink href={localePath(locale, '/')} className="flex shrink-0 items-center no-underline">
-            {/* The brand-sheet logo, teal and gold for a white bar. See public/pakrimits-new-logo.svg.
-
-                Plain <img>, not next/image: the source is a static SVG, which the
-                image optimiser passes through untouched anyway and only serves
-                behind `dangerouslyAllowSVG`. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/pakrimits-new-logo.svg"
-              alt="PakRemits"
-              width={185}
-              height={36}
-              className="h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:hidden"
-            />
-            {/* Dark theme: same mark, light wordmark. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/pakrimits-new-logo-dark.svg"
-              alt="PakRemits"
-              width={185}
-              height={36}
-              className="hidden h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:block"
-            />
+            {logo}
           </ScrollTopLink>
 
           {/* Hidden on the landmark, not the list: leaving an empty <nav> with
@@ -120,24 +158,52 @@ export async function SiteHeader({
             toLightLabel={t('themeLight')}
             className="hidden sm:grid"
           />
-          {/* Dropped below 360px, where it would run over the logo; "Rate
-              alerts" in the menu reaches the same dialog. */}
+          {/* Opens the rate alert dialog. A bell alone on phones, where the
+              label would crowd the logo; the drawer carries the full action. */}
           <Link
-            href={`${localePath(locale, '/')}#alerts`}
-            className="flex h-12 items-center rounded-[10px] border border-line bg-surface px-3.5 max-[359px]:hidden
-                       text-[14px] font-semibold sm:text-[15px] whitespace-nowrap text-ink no-underline
-                       transition-[border-color,box-shadow] hover:border-accent hover:shadow-[0_0_0_2px_var(--color-accent)] sm:px-6"
+            href={alertHref}
+            aria-label={t('rateAlert')}
+            className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-line bg-surface
+                       text-[15px] font-semibold whitespace-nowrap text-ink no-underline
+                       transition-[border-color,box-shadow] hover:border-accent hover:shadow-[0_0_0_2px_var(--color-accent)]
+                       sm:h-12 sm:w-auto sm:px-6"
           >
-            {t('setAlert')}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5 sm:hidden"
+              aria-hidden="true"
+            >
+              <path d={BELL_ICON} />
+            </svg>
+            <span className="hidden sm:inline">{t('rateAlert')}</span>
           </Link>
 
           <MobileNav
-            items={nav}
+            items={drawer.map((item) => ({
+              href: item.href,
+              label: item.label,
+              icon: drawerIcon(item.key),
+              current: item.key === active,
+            }))}
             label={t('main')}
             openLabel={t('openMenu')}
             closeLabel={t('closeMenu')}
+            brand={
+              <Link href={localePath(locale, '/')} className="flex items-center no-underline">
+                {logo}
+              </Link>
+            }
+            cta={{ href: alertHref, label: t('setAlert') }}
             footer={
-              <ThemeToggle toDarkLabel={t('themeDark')} toLightLabel={t('themeLight')} />
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-[15px] text-muted">{t('appearance')}</span>
+                <ThemeToggle toDarkLabel={t('themeDark')} toLightLabel={t('themeLight')} />
+              </div>
             }
           />
         </div>
