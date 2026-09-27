@@ -95,6 +95,7 @@ export function composeTriggerMessage(context: AlertContext, channel: Channel) {
       `Unsubscribe in one click: ${siteUrl()}/alerts/unsubscribe/${context.token}`,
     ].join('\n'),
     html: renderAlertEmail({
+      homeUrl: siteUrl(),
       preview: headline,
       label: 'Rate alert',
       title: headline,
@@ -137,6 +138,7 @@ export function composeConfirmMessage(context: {
       `Remove this request now: ${siteUrl()}/alerts/unsubscribe/${context.token}`,
     ].join('\n'),
     html: renderAlertEmail({
+      homeUrl: siteUrl(),
       preview: `Confirm your ${context.fromCurrency} to PKR rate alert`,
       label: 'One quick step',
       title: 'Confirm your rate alert',
@@ -179,6 +181,7 @@ export function composeDigestMessage(context: {
       `Unsubscribe from this alert: ${siteUrl()}/alerts/unsubscribe/${context.token}`,
     ].join('\n'),
     html: renderAlertEmail({
+      homeUrl: siteUrl(),
       preview: `${context.fromCurrency} to PKR is ${context.currentRate.toFixed(2)} this week`,
       label: 'Weekly rate update',
       title: `${context.fromCurrency} to PKR: ${context.currentRate.toFixed(2)}`,
