@@ -279,7 +279,7 @@ export default async function AdminDashboard() {
                       </td>
                       <td className="py-2.5">
                         {row.confirmed ? (
-                          <span className="text-[#1C6B4A]">yes</span>
+                          <span className="text-[#037252]">yes</span>
                         ) : (
                           <span className="text-muted">pending</span>
                         )}

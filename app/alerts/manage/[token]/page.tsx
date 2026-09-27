@@ -67,7 +67,7 @@ export default async function ManageAlertPage({
       <main className="mx-auto max-w-[1120px] px-6 py-14">
         <article className="max-w-[62ch]">
           {justConfirmed === '1' && (
-            <p className="mb-6 rounded-panel border border-leaf bg-[#E4F3EB] p-4 text-[15px] text-[#1C6B4A]">
+            <p className="mb-6 rounded-panel border border-leaf bg-[#dcf5ec] p-4 text-[15px] text-[#037252]">
               Confirmed. We will message you when the rate crosses your target.
             </p>
           )}
@@ -122,7 +122,7 @@ export default async function ManageAlertPage({
                 type="checkbox"
                 name="wantsDigest"
                 defaultChecked={alert.wantsDigest}
-                className="mt-1 h-4 w-4 accent-[#1C7C54]"
+                className="mt-1 h-4 w-4 accent-[#037252]"
               />
               <span className="text-[15.5px]">
                 Send me a weekly summary of where {alert.fromCurrency} → PKR has been

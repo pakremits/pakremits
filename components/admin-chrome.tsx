@@ -21,7 +21,7 @@ export function AdminNav({ current }: { current: string }) {
         <span className="flex items-center gap-2 font-display text-lg font-semibold">
           {/* Light variant — the admin bar is white, unlike the public chrome. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/pakrimits-new-logo.svg" alt="PakRemits" width={102} height={28} className="h-7 w-auto" />
+          <img src="/pakrimits-new-logo.svg" alt="PakRemits" width={103} height={20} className="h-5 w-auto" />
           <span className="text-muted">admin</span>
         </span>
         <nav className="flex flex-wrap gap-x-5 gap-y-1 text-sm">

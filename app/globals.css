@@ -5,22 +5,42 @@
    the header toggle has to win over the OS setting. */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
+/* Short phones (iPhone SE and smaller): the home hero trims a little more so
+   its search card still fits on the first screen. */
+@custom-variant short-phone (@media (max-width: 639.98px) and (max-height: 700px));
+
+/* The results' row layout: desktop widths, and only while the reader has the
+   list view on (`data-view` on the results section). Grid view keeps the
+   stacked phone card at every width. */
+@custom-variant list-view {
+  @media (width >= 64rem) {
+    &:where([data-view='list'] *) {
+      @slot;
+    }
+  }
+}
+
 /**
- * Design tokens, lifted verbatim from bhejo-design.html.
+ * Design tokens.
  *
  * Tailwind v4 reads these directly: `--color-leaf` becomes `bg-leaf`,
- * `--radius-panel` becomes `rounded-panel`, and so on. Nothing here should be
- * changed without changing the design file too.
+ * `--radius-panel` becomes `rounded-panel`, and so on.
+ *
+ * Brand colours follow the PakRemits brand sheet: primary #02d39c, #14936f,
+ * #037252; accents #e0a513 (gold) and #a0269d (purple). Anything used as text
+ * is that hue or a shade of it chosen to clear WCAG AA (4.5:1) on the
+ * surfaces it sits on. The neutrals are unchanged.
  */
 @theme {
-  --color-green: #0b3d2e;
-  --color-green-2: #0f4a38;
-  --color-green-3: #175a45;
-  --color-leaf: #1c7c54;
-  --color-leaf-dark: #166944;
-  --color-gold: #e9b44c;
-  --color-gold-dark: #8a6420;
-  --color-gold-bg: #fbf4e3;
+  --color-green: #03543c;
+  --color-green-2: #04624a;
+  --color-green-3: #0a7a5a;
+  --color-leaf: #037252;
+  --color-leaf-dark: #025c42;
+  --color-gold: #e0a513;
+  --color-gold-hover: #c8930f;
+  --color-gold-dark: #7a5a06;
+  --color-gold-bg: #fcf4df;
   --color-mist: #f3f6f4;
   --color-ink: #14201b;
   --color-line: #dce4df;
@@ -34,7 +54,7 @@
   --color-faint: #68716b;
   /* Sparkline up/down. Deliberately not red/green alone — the arrow glyph
      carries the meaning too, for colour-blind readers. */
-  --color-up: #8fe0b3;
+  --color-up: #7fe8c9;
   --color-down: #f5a3a3;
 
   /* Surfaces and accents that used to be hard-coded hex values. Named so the
@@ -44,22 +64,27 @@
   --color-footer: #f1f2ef;
   /* The "Where are you sending from" band: invisible in light, a panel in dark. */
   --color-band: transparent;
-  --color-tint: #eef3e3;
-  --color-tint-ink: #2f520b;
-  --color-nav-tint: #e9f2ec;
-  --color-icon-bg: #e4f3eb;
-  --color-ok: #1c6b4a;
+  --color-tint: #e3f6ef;
+  --color-tint-ink: #037252;
+  --color-nav-tint: #e6f4ee;
+  --color-icon-bg: #dcf5ec;
+  --color-ok: #037252;
   --color-ink-2: #4a5a52;
   --color-danger: #a32d2d;
   --color-danger-bg: #fbe9e9;
-  --color-promo: #7a4eb8;
-  --color-promo-bg: #f1eafb;
+  --color-promo: #a0269d;
+  --color-promo-bg: #f8e8f7;
   /* Payout bars (and, in dark, the best row's saving line) on result rows. */
-  --color-bar: #4f8a5b;
+  --color-bar: #14936f;
   /* The bank benchmark's bar; in dark, also its "less than best" line. */
   --color-bar-low: #e0b4b4;
   /* Text on gold buttons: dark in both themes, because the gold is. */
   --color-on-gold: #14201b;
+  /* Hover and focus rings, and the amount field's border. */
+  --color-accent: #14936f;
+  /* Solid fills under white text: the deepest brand green in both themes. */
+  --color-brand: #037252;
+  --color-brand-hover: #025c42;
 
   /* 10px on controls, 14–20px on panels. No other radii. */
   --radius-control: 10px;
@@ -74,35 +99,40 @@
   --font-urdu: var(--font-nastaliq), serif;
 }
 
-/* Only the tokens change; every utility built on them follows. */
+/* Only the tokens change; every utility built on them follows.
+
+   Dark neutrals are a charcoal pulled toward the brand green rather than flat
+   grey, so the page belongs to the same family as the hero band. Text tokens
+   are checked for AA on both surface and tint. */
 [data-theme='dark'] {
   color-scheme: dark;
-  --color-mist: #343434;
-  --color-surface: #3d3d3d;
-  --color-header: #2e2e2e;
-  --color-footer: #474747;
-  --color-band: #474747;
-  --color-ink: #f2f2f0;
-  --color-ink-2: #d4d6d2;
-  --color-muted: #c2c4c0;
-  --color-faint: #a9aca7;
-  --color-line: #575757;
-  --color-line-2: #4a4a4a;
-  --color-green: #b9d86a;
-  --color-leaf: #7fcf9f;
-  --color-leaf-dark: #6cc190;
-  --color-gold-bg: #4a4230;
-  --color-gold-dark: #ecc57c;
-  --color-tint: #47503a;
-  --color-tint-ink: #cfe68a;
-  --color-nav-tint: #474747;
-  --color-icon-bg: #34493d;
-  --color-ok: #9fdcb8;
+  --color-mist: #151d1a;
+  --color-surface: #1d2823;
+  --color-header: #18211d;
+  --color-footer: #1a2420;
+  --color-band: #1a2420;
+  --color-ink: #eef3f0;
+  --color-ink-2: #cdd7d2;
+  --color-muted: #a8b5af;
+  --color-faint: #95a29c;
+  --color-line: #33433c;
+  --color-line-2: #27342e;
+  --color-green: #5fe3bd;
+  --color-leaf: #3fdcae;
+  --color-leaf-dark: #2fcb9d;
+  --color-gold-bg: #3a321c;
+  --color-gold-dark: #f0c24f;
+  --color-tint: #1c3a30;
+  --color-tint-ink: #8ff0d2;
+  --color-nav-tint: #23322c;
+  --color-icon-bg: #1f4034;
+  --color-ok: #7fe8c9;
   --color-danger: #f29a9a;
-  --color-danger-bg: #5a3434;
-  --color-promo: #cdb2f2;
-  --color-promo-bg: #473d57;
-  --color-bar: #8da53a;
+  --color-danger-bg: #4a2a2a;
+  --color-promo: #eaa6e7;
+  --color-promo-bg: #3e2a41;
+  --color-bar: #14b886;
+  --color-accent: #02d39c;
   /* Same muted weight as the green bar, in red. */
   --color-bar-low: #c4574a;
 }
@@ -139,27 +169,104 @@ body {
   }
 }
 
-/* Home hero band. Values are the design's. */
+/* Home hero band: #037252 → #14936f → #14936f blended halfway to #02d39c.
+   Stopping short of the brightest green keeps the white headline legible.
+   CorridorHero draws the same stops, so this is also its first frame. */
 .hero-gradient {
-  background: #2f520b;
-  background: linear-gradient(
-    61deg,
-    rgba(47, 82, 11, 1) 0%,
-    rgba(83, 122, 14, 1) 53%,
-    rgba(133, 166, 28, 1) 100%
-  );
+  background: #037252;
+  background: linear-gradient(61deg, #037252 0%, #14936f 60%, #0ab688 100%);
 }
 
 /* Dark theme: the same three stops, about a third darker, so the banner sits
-   with the #343434 page instead of glowing against it. */
+   with the #151d1a page instead of glowing against it. */
 [data-theme='dark'] .hero-gradient {
-  background: #213a08;
-  background: linear-gradient(
-    61deg,
-    rgba(33, 58, 8, 1) 0%,
-    rgba(58, 86, 10, 1) 53%,
-    rgba(93, 116, 20, 1) 100%
-  );
+  background: #024e38;
+  background: linear-gradient(61deg, #024e38 0%, #0e644b 60%, #077c5c 100%);
+}
+
+/* Scroll lock for every overlay. A modal <dialog> blocks clicks on the page
+   but not scrolling, and locking <body> alone is not enough on iOS Safari —
+   the lock has to be on <html>. Native dialogs (rate alert, compare sheet)
+   trigger it by being open; the mobile drawer sets data-scroll-locked.
+   scrollbar-gutter keeps the page from shifting sideways where the
+   scrollbar takes up room. */
+html:has(dialog[open]),
+html[data-scroll-locked] {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* Scrolling to the end of a dialog must not carry on into the page behind it.
+   (The drawer's link list does the same with `overscroll-contain`.) */
+dialog {
+  overscroll-behavior: contain;
+}
+
+/* The rate alert dialog is a bottom sheet on phones: full width, pinned to
+   the bottom edge, sliding up on open and down on close (the component sets
+   data-closing and waits for the animation). Unlayered, so it wins over the
+   dialog's centred-card utilities. */
+@media (max-width: 639.98px) {
+  .alert-sheet {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: 92dvh;
+    border-radius: 22px 22px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .alert-sheet[open] {
+    animation: sheet-up 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .alert-sheet[open]::backdrop {
+    animation: sheet-fade 0.3s ease-out;
+  }
+  .alert-sheet[data-closing] {
+    animation: sheet-down 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+  .alert-sheet[data-closing]::backdrop {
+    animation: sheet-fade 0.24s ease-in reverse forwards;
+  }
+}
+
+/* The /compare search on phones is a full-screen page rather than a sheet:
+   edge to edge, content from the top, clear of the notch. It appears and
+   goes at once, with no slide. */
+@media (max-width: 639.98px) {
+  .screen-sheet {
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert-sheet[open],
+  .alert-sheet[open]::backdrop {
+    animation: none;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 /* Chromium exposes a proprietary marker for <summary>. Keeping this as plain
@@ -292,5 +399,44 @@ body {
 
   .marquee-dup {
     display: none !important;
+  }
+}
+
+/* Loading placeholders (the /compare results skeleton). The line colour at
+   reduced strength reads on the white cards, the grey mist boxes and the dark
+   theme's surfaces alike; a soft highlight sweeps across it. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: color-mix(in oklab, var(--color-line) 70%, transparent);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+[data-theme='dark'] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+
+[dir='rtl'] .skeleton::after {
+  animation-direction: reverse;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+    display: none;
   }
 }

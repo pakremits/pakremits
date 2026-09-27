@@ -36,7 +36,11 @@ test.beforeEach(async ({ page }) => {
   // hands off to /compare. Corridor pages still carry it in full.
   await page.goto('/send-money-from-uk-to-pakistan')
   // Wait for the server-rendered table rather than a fixed sleep.
-  await expect(page.locator(`${results} >> text=/Recipient gets|₨|Rs/`).first()).toBeVisible()
+  // Visible matches only: the desktop column headings carry the same words
+  // and are hidden on phones.
+  await expect(
+    page.locator(`${results} >> text=/Recipient gets|₨|Rs/ >> visible=true`).first(),
+  ).toBeVisible()
 })
 
 test('ranks providers by rupees received, highest first', async ({ page }) => {

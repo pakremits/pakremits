@@ -53,7 +53,7 @@ export function Sparkline({
   })
 
   const stroke =
-    trend === 'up' ? 'var(--color-up)' : trend === 'down' ? 'var(--color-down)' : '#7FA090'
+    trend === 'up' ? 'var(--color-up)' : trend === 'down' ? 'var(--color-down)' : '#7aa596'
 
   return (
     <svg

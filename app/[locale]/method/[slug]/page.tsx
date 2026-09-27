@@ -78,7 +78,7 @@ export default async function MethodPage({ params }: { params: Promise<{ locale:
         <div className="relative pt-10 pb-24 text-white sm:pt-14 sm:pb-28">
           <div
             aria-hidden="true"
-            className="hero-gradient absolute inset-0 [clip-path:polygon(0_0,100%_0,100%_86%,0_100%)]"
+            className="hero-gradient absolute inset-0"
           />
           <div className="relative mx-auto max-w-[1120px] px-6">
             <nav aria-label="Breadcrumb" className="text-[13px] text-white/70">

@@ -2,16 +2,27 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { CompareSearch } from '@/components/compare-search'
+import { CorridorHero } from '@/components/corridor-hero'
 import { SiteFooter, SiteHeader } from '@/components/site-chrome'
-import { CORRIDORS, defaultAmountFor } from '@/lib/corridors'
-import { getBestRatePerCorridor, getMidMarketSeries } from '@/lib/quotes'
+import { eq } from 'drizzle-orm'
+import { CORRIDORS, CURRENCY_SYMBOLS, defaultAmountFor, formatSend } from '@/lib/corridors'
+import { getBestRatePerCorridor, getComparison, getMidMarketSeries } from '@/lib/quotes'
+import { db } from '@/lib/db'
+import { providers as providersTable } from '@/lib/db/schema'
 import type { SendCurrency } from '@/lib/db/schema'
 import { notFound } from 'next/navigation'
-import { alternatesFor, isLocale } from '@/i18n/routing'
+import { alternatesFor, isLocale, localePath } from '@/i18n/routing'
 import { corridorPath } from '@/lib/routes'
 import { RateAlertCta } from '@/components/rate-alert-cta'
 import { RateMarquee } from '@/components/rate-marquee'
 import { CountryFlag } from '@/components/select-icons'
+import { PayoutGuide } from '@/components/payout-guide'
+import { PROOF_CARD, ProofStrip } from '@/components/proof-strip'
+import { ProviderRoster, type RosterProvider } from '@/components/provider-roster'
+import { RateChart } from '@/components/rate-chart'
+import { TodaysExample } from '@/components/todays-example'
+import { PAYOUT_OPTIONS } from '@/lib/payout'
+import { getProofStats } from '@/lib/proof/stats'
 import { CLAIM_FIRST_PAKISTAN_ONLY_SITE } from '@/lib/proof/config'
 import { publicPageMetadata } from '@/lib/seo'
 
@@ -34,6 +45,48 @@ export async function generateMetadata({
 // after each refresh, and this is the backstop if that ping is ever missed.
 export const revalidate = 900
 
+
+/** Where each sending corridor starts on the hero map. The Eurozone uses Germany. */
+const HERO_ORIGINS: Record<string, { lon: number; lat: number }> = {
+  uk: { lon: -1.5, lat: 52.5 },
+  uae: { lon: 55.3, lat: 25.2 },
+  'saudi-arabia': { lon: 46.7, lat: 24.7 },
+  qatar: { lon: 51.5, lat: 25.3 },
+  usa: { lon: -95, lat: 38 },
+  canada: { lon: -79.4, lat: 43.7 },
+  eurozone: { lon: 10, lat: 51 },
+  australia: { lon: 151.2, lat: -33.9 },
+}
+
+/**
+ * The hero form opens on $1,000 from the USA, and the worked example, payout
+ * guide and chart follow it. 1,000 is one of USD's standard amounts, so the
+ * example always has fresh quotes.
+ */
+const EXAMPLE_CORRIDOR = CORRIDORS.find((corridor) => corridor.slug === 'usa') ?? CORRIDORS[0]
+const EXAMPLE_AMOUNT = 1000
+
+/** Active, real providers for the roster. Empty (and the section hidden) if the DB is down. */
+async function listRosterProviders(): Promise<RosterProvider[]> {
+  try {
+    const rows = await db
+      .select({
+        slug: providersTable.slug,
+        name: providersTable.name,
+        brandColor: providersTable.brandColor,
+        brandTextColor: providersTable.brandTextColor,
+        isBenchmark: providersTable.isBenchmark,
+      })
+      .from(providersTable)
+      .where(eq(providersTable.active, true))
+      .orderBy(providersTable.name)
+    return rows.filter((row) => !row.isBenchmark)
+  } catch (error) {
+    // The lazy DB proxy can throw before a promise exists, e.g. with no DATABASE_URL at build.
+    console.error('[home] provider roster failed:', error)
+    return []
+  }
+}
 
 const COUNTRY_BY_CURRENCY = new Map(
   CORRIDORS.map((corridor) => [corridor.fromCurrency, corridor.fromCountry]),
@@ -72,12 +125,23 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     { q: t('faq6Q'), a: t('faq6A') },
   ]
 
-  const [chips, series] = await Promise.all([
+  const [chips, series, example, proofStats, rosterProviders, exampleSeries] = await Promise.all([
     getBestRatePerCorridor(),
     // Every corridor currency: the marquee carries a 7-day trend chip per
     // sending country.
     Promise.all(CORRIDORS.map((corridor) => getMidMarketSeries(corridor.fromCurrency, 7))),
+    getComparison({ corridorSlug: EXAMPLE_CORRIDOR.slug, amount: EXAMPLE_AMOUNT }),
+    getProofStats(),
+    listRosterProviders(),
+    getMidMarketSeries(EXAMPLE_CORRIDOR.fromCurrency, 30),
   ])
+
+  const exampleSendLabel = formatSend(CURRENCY_SYMBOLS[EXAMPLE_CORRIDOR.fromCurrency], EXAMPLE_AMOUNT)
+  const exampleCompareHref = `${localePath(locale, '/compare')}?${new URLSearchParams({
+    from: EXAMPLE_CORRIDOR.slug,
+    to: 'bank',
+    amount: String(EXAMPLE_AMOUNT),
+  })}`
 
   const seriesByCurrency = new Map(series.map((entry) => [entry.currency, entry]))
 
@@ -94,6 +158,20 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     defaultAmount: defaultAmountFor(corridor.fromCurrency),
   }))
 
+  const heroCorridors = chips.flatMap((chip) => {
+    const origin = HERO_ORIGINS[chip.slug]
+    if (!origin) return []
+    return [
+      {
+        ...origin,
+        href: corridorPath(chip.slug, locale),
+        label: chip.countryName,
+        detail:
+          chip.bestRate === null ? undefined : `${chip.currency} → PKR ${chip.bestRate.toFixed(2)}`,
+      },
+    ]
+  })
+
   return (
     <>
       {COMPARISON_IMAGE_ASSETS.map((href) => (
@@ -102,14 +180,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       <SiteHeader locale={locale} />
 
-      <header className="relative pt-12 sm:pt-20">
-        {/* The gradient band stops short of the header's bottom edge so the
-            search card straddles it, and its lower edge slopes up to the right. */}
-        <div
-          aria-hidden="true"
-          className="hero-gradient absolute inset-x-0 top-0 bottom-[118px]
-                     [clip-path:polygon(0_0,100%_0,100%_86%,0_100%)] sm:bottom-[168px]"
-        />
+      {/* The band is an interactive map of the corridors; hover a country for
+          today's best rate, click it to open that corridor. */}
+      <CorridorHero
+        corridors={heroCorridors}
+        home={{
+          label: t('heroHomeLabel'),
+          detail: t('heroHomeDetail', { count: heroCorridors.length }),
+        }}
+        className="pt-6 pb-[30px] short-phone:pt-4 sm:pt-20">
 
         <div className="relative mx-auto max-w-[980px] px-6 text-center text-white">
           {/* Off by default. See CLAIM_FIRST_PAKISTAN_ONLY_SITE — it must not
@@ -120,27 +199,39 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </p>
           )}
 
-          <h1 className="mx-auto max-w-[20ch] font-hero text-[clamp(36px,5vw,62px)] leading-[1.08] font-bold tracking-[-0.03em]">
+          <h1 className="mx-auto max-w-[20ch] font-hero text-[30px] leading-[1.1] font-bold tracking-[-0.03em] sm:text-[clamp(36px,5vw,62px)] sm:leading-[1.08]">
             {t('heroTitle')}
           </h1>
 
-          <p className="mx-auto mt-5 max-w-[62ch] text-[17px] leading-relaxed text-white/90 sm:text-lg">
+          <p className="mx-auto mt-3 max-w-[62ch] text-[15px] leading-normal text-white/90 short-phone:mt-2 short-phone:text-[14px] sm:mt-5 sm:text-lg sm:leading-relaxed">
             {t('heroLede')}
           </p>
         </div>
 
-        <div id="compare" className="relative mx-auto mt-10 max-w-[900px] px-4 sm:mt-14 sm:px-6">
+        <div id="compare" className="relative z-[2] mx-auto mt-6 max-w-[900px] px-4 short-phone:mt-4 sm:mt-14 sm:px-6 lg:mt-[46px]">
           <h2 className="sr-only">{tPanel('heading')}</h2>
-          <CompareSearch corridors={corridorOptions} />
+          <CompareSearch
+            corridors={corridorOptions}
+            initialCorridor={EXAMPLE_CORRIDOR.slug}
+            initialAmount={EXAMPLE_AMOUNT}
+          />
         </div>
-      </header>
+      </CorridorHero>
 
       <main className="mx-auto max-w-[1120px] px-6">
-        {/* Corridor marquee — full-bleed, so it sits outside the column above. */}
+        {/* Corridor marquee — full-bleed, so it sits outside the column. */}
         <RateMarquee locale={locale} items={marqueeItems} />
 
+        {/* One real comparison, drawn as rupees received. */}
+        <TodaysExample
+          locale={locale}
+          comparison={example}
+          countryName={EXAMPLE_CORRIDOR.fromCountryName}
+          sendLabel={exampleSendLabel}
+          compareHref={exampleCompareHref}
+        />
 
-        <section className="mt-16" aria-labelledby="trust-cards-title">
+        <section id="trust" className="mt-16" aria-labelledby="trust-cards-title">
           <div className="max-w-[54ch]">
             <h2
               id="trust-cards-title"
@@ -204,62 +295,24 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               </li>
             ))}
           </ul>
-        </section>
 
-        {/* Corridors. Full-bleed like the marquee, so the dark theme's band
-            runs edge to edge; in light the band is transparent and the section
-            looks as it always did. */}
-        <section
-          id="corridors"
-          className="ms-[calc(50%-50vw)] mt-24 w-screen bg-band dark:mt-16 dark:py-16"
-        >
-          <div className="mx-auto max-w-[1120px] px-6">
-            <div className="max-w-[44ch]">
-              <h2 className="text-[clamp(30px,4vw,36px)] leading-[1.1] font-semibold">
-                {t('corridorsTitle')}
-              </h2>
-              <p className="mt-3 text-[17px] text-muted">
-                {t('corridorsLede')}
+          {/* The live gap already has its own section above, so it is not repeated here. */}
+          <ProofStrip
+            locale={locale}
+            stats={proofStats}
+            liveGapOnStandardAmount={null}
+            sendAmountLabel={exampleSendLabel}
+          >
+            <li className={PROOF_CARD}>
+              <p className="text-[15px] leading-[1.4] font-medium text-ink">
+                {tProof('proofCountries', {
+                  countries: CORRIDORS.length,
+                  payouts: PAYOUT_OPTIONS.length,
+                })}
               </p>
-            </div>
-
-            <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {chips.map((chip) => (
-                <Link
-                  key={chip.slug}
-                  href={corridorPath(chip.slug, locale)}
-                  className="flex flex-col gap-3.5 rounded-[14px] border border-line bg-surface p-4.5
-                             no-underline transition-[border-color,box-shadow] hover:border-[#85A61C]
-                             hover:shadow-[0_0_0_2px_#85A61C]"
-                >
-                  <span className="flex items-center gap-3 text-[15px] font-medium">
-                    <span className="grid h-8 w-9 place-items-center" aria-hidden="true">
-                      <CountryFlag
-                        countryCode={COUNTRY_BY_CURRENCY.get(chip.currency as SendCurrency) ?? 'EU'}
-                      />
-                    </span>
-                    {chip.countryName}
-                  </span>
-                  <span className="flex items-baseline justify-between border-t border-line-2 pt-3 text-[12.5px] text-muted">
-                    {t('bestToday')}
-                    <b className="font-display text-lg font-semibold tabular-nums text-ink">
-                      {chip.bestRate?.toFixed(2) ?? '—'}
-                    </b>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
+            </li>
+          </ProofStrip>
         </section>
-
-        {/* Rate alerts, under the corridor picker. Opens the dialog. */}
-        <RateAlertCta
-          locale={locale}
-          title={tAlerts('dialogTitle')}
-          body={tAlerts('ctaBody')}
-          button={tNav('setAlert')}
-          className="mt-16"
-        />
 
         {/* Why our ranking is different */}
         <section id="how" className="mt-24">
@@ -307,6 +360,76 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             ))}
           </div>
         </section>
+
+        {/* Every service in the comparison. */}
+        <ProviderRoster locale={locale} providers={rosterProviders} />
+
+        {/* Corridors. Full-bleed like the marquee, so the dark theme's band
+            runs edge to edge; in light the band is transparent and the section
+            looks as it always did. */}
+        <section
+          id="corridors"
+          className="ms-[calc(50%-50vw)] mt-24 w-screen bg-band dark:mt-16 dark:py-16"
+        >
+          <div className="mx-auto max-w-[1120px] px-6">
+            <div className="max-w-[44ch]">
+              <h2 className="text-[clamp(30px,4vw,36px)] leading-[1.1] font-semibold">
+                {t('corridorsTitle')}
+              </h2>
+              <p className="mt-3 text-[17px] text-muted">
+                {t('corridorsLede')}
+              </p>
+            </div>
+
+            <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {chips.map((chip) => (
+                <Link
+                  key={chip.slug}
+                  href={corridorPath(chip.slug, locale)}
+                  className="flex flex-col gap-3.5 rounded-[14px] border border-line bg-surface p-4.5
+                             no-underline transition-[border-color,box-shadow] hover:border-accent
+                             hover:shadow-[0_0_0_2px_var(--color-accent)]"
+                >
+                  <span className="flex items-center gap-3 text-[15px] font-medium">
+                    <span className="grid h-8 w-9 place-items-center" aria-hidden="true">
+                      <CountryFlag
+                        countryCode={COUNTRY_BY_CURRENCY.get(chip.currency as SendCurrency) ?? 'EU'}
+                      />
+                    </span>
+                    {chip.countryName}
+                  </span>
+                  <span className="flex items-baseline justify-between border-t border-line-2 pt-3 text-[12.5px] text-muted">
+                    {t('bestToday')}
+                    <b className="font-display text-lg font-semibold tabular-nums text-ink">
+                      {chip.bestRate?.toFixed(2) ?? '—'}
+                    </b>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Payout rails, after the country picker: where from, then where to. */}
+        <PayoutGuide locale={locale} corridor={EXAMPLE_CORRIDOR.slug} amount={EXAMPLE_AMOUNT} />
+
+        {/* Rate alerts, with the trend they would be watching. Opens the dialog. */}
+        <RateAlertCta
+          locale={locale}
+          title={tAlerts('dialogTitle')}
+          body={tAlerts('ctaBody')}
+          button={tNav('setAlert')}
+          className="mt-24"
+          aside={
+            <RateChart
+              points={exampleSeries.points}
+              currency={EXAMPLE_CORRIDOR.fromCurrency}
+              label={t('alertChartLabel', { currency: EXAMPLE_CORRIDOR.fromCurrency })}
+              height={200}
+              bare
+            />
+          }
+        />
 
         {/* FAQ */}
         <section id="faq" className="mt-24">

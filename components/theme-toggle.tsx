@@ -52,7 +52,7 @@ export function ThemeToggle({
       title={dark ? toLightLabel : toDarkLabel}
       className={`grid h-12 w-12 shrink-0 cursor-pointer place-items-center rounded-[10px] border
                   border-line bg-surface text-ink transition-[border-color,box-shadow]
-                  hover:border-[#85A61C] hover:shadow-[0_0_0_2px_#85A61C] ${className}`}
+                  hover:border-accent hover:shadow-[0_0_0_2px_var(--color-accent)] ${className}`}
     >
       <svg
         viewBox="0 0 24 24"

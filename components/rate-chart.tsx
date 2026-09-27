@@ -17,11 +17,13 @@ interface RateChartProps {
   /** Accessible summary. The SVG itself is decorative once this is read. */
   label: string
   height?: number
+  /** Drop the panel frame, for a chart that sits inside another panel. */
+  bare?: boolean
 }
 
 const DATE_FMT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
 
-export function RateChart({ points, currency, label, height = 220 }: RateChartProps) {
+export function RateChart({ points, currency, label, height = 220, bare = false }: RateChartProps) {
   if (points.length < 2) {
     return (
       <p className="rounded-panel border border-line bg-surface p-6 text-sm text-muted">
@@ -65,7 +67,7 @@ export function RateChart({ points, currency, label, height = 220 }: RateChartPr
   const rising = changePercent > 0
 
   return (
-    <figure className="rounded-panel border border-line bg-surface p-6">
+    <figure className={bare ? '' : 'rounded-panel border border-line bg-surface p-6'}>
       <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h3 className="font-display text-lg font-semibold">{label}</h3>
@@ -79,7 +81,7 @@ export function RateChart({ points, currency, label, height = 220 }: RateChartPr
           </b>
           <span
             className="text-[13px] tabular-nums"
-            style={{ color: rising ? '#1C6B4A' : '#A32D2D' }}
+            style={{ color: rising ? 'var(--color-ok)' : 'var(--color-danger)' }}
           >
             {rising ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}% over the period
           </span>

@@ -9,7 +9,7 @@ export type PayoutOption =
   | 'cash'
   | 'rda'
 
-const flagClass = 'h-5 w-7 rounded-[4px] shadow-[0_0_0_1px_rgba(11,61,46,.12)]'
+const flagClass = 'h-5 w-7 rounded-[4px] shadow-[0_0_0_1px_rgba(2,78,56,.12)]'
 
 export function CountryFlag({ countryCode }: { countryCode: string }) {
   if (countryCode === 'GB') {
@@ -40,6 +40,21 @@ export function CountryFlag({ countryCode }: { countryCode: string }) {
       <svg viewBox="0 0 28 20" className={flagClass} aria-hidden="true">
         <rect width="28" height="20" fill="#006C35" />
         <path d="M7 8h14M9 11h10M8 14h12" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    )
+  }
+
+  // The receiving side: the compare page's phone summary shows USD → PKR with both flags.
+  if (countryCode === 'PK') {
+    return (
+      <svg viewBox="0 0 28 20" className={flagClass} aria-hidden="true">
+        <rect width="28" height="20" fill="#01411C" />
+        <rect width="7" height="20" fill="#fff" />
+        <path
+          fill="#fff"
+          d="M22.4 13.9a5 5 0 1 1-1.2-8.6 4.1 4.1 0 1 0 1.2 8.6z"
+        />
+        <path fill="#fff" d="m21.6 6.1.5 1.4h1.5l-1.2.9.4 1.4-1.2-.9-1.2.9.4-1.4-1.2-.9h1.5z" />
       </svg>
     )
   }

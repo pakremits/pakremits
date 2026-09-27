@@ -6,8 +6,8 @@ import { claimMap, evaluateClaims } from '@/lib/proof/claims'
 import { formatProofPkr, formatProofPkrFull } from '@/lib/proof/format'
 import type { ProofStats } from '@/lib/proof/stats'
 
-/** The card shell, shared with the cards callers pass in as `children`. */
-export const PROOF_CARD = 'rounded-panel border border-line bg-surface px-7 py-6.5'
+/** One cell of the strip, shared with the cells callers pass in as `children`. */
+export const PROOF_CARD = 'flex flex-col justify-between border-e border-b border-line bg-tint px-6 py-5'
 
 /**
  * The proof strip: claims that are true right now, and nothing else.
@@ -121,22 +121,26 @@ export async function ProofStrip({
   if (items.length === 0 && !children) return null
 
   return (
-    <section className="mt-5" aria-label={t('stripLabel')}>
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((item) => (
-          <li key={item.key} className={PROOF_CARD}>
-            <p className="text-[17px] leading-[1.35] font-medium text-ink">{item.body}</p>
-            <Link
-              href={item.href}
-              className="mt-3.5 inline-block text-[13px] text-muted underline underline-offset-2
-                         hover:text-leaf"
-            >
-              {t('howWeCount')}
-            </Link>
-          </li>
-        ))}
-        {children}
-      </ul>
+    <section className="mt-4" aria-label={t('stripLabel')}>
+      {/* One ruled strip, not more cards: these are measurements, read side by side.
+          -mb-px/-me-px tuck the outer cells' rules under the frame. */}
+      <div className="overflow-hidden rounded-panel border border-line">
+        <ul className="-me-px -mb-px grid sm:grid-cols-2 lg:grid-cols-4">
+          {items.map((item) => (
+            <li key={item.key} className={PROOF_CARD}>
+              <p className="text-[15px] leading-[1.4] font-medium text-ink">{item.body}</p>
+              <Link
+                href={item.href}
+                className="mt-3 inline-block self-start text-[13px] text-muted underline underline-offset-2
+                           hover:text-leaf"
+              >
+                {t('howWeCount')}
+              </Link>
+            </li>
+          ))}
+          {children}
+        </ul>
+      </div>
     </section>
   )
 }

@@ -56,7 +56,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background: '#0B3D2E',
+          background: '#024E38',
           color: '#F3F6F4',
           padding: '64px 72px',
           fontFamily: 'sans-serif',
@@ -68,13 +68,13 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
             wordmark back here only alongside a subsetted font file. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 34 }}>
           <span style={{ fontWeight: 700 }}>PakRemits</span>
-          <span style={{ color: '#E9B44C', fontSize: 26 }}>
+          <span style={{ color: '#E0A513', fontSize: 26 }}>
             Compare rates to Pakistan
           </span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div style={{ fontSize: 30, color: '#B2C6BC' }}>
+          <div style={{ fontSize: 30, color: '#B7E4D4' }}>
             {corridor ? `${corridor.fromCountryName} → Pakistan` : 'Send money to Pakistan'}
           </div>
 
@@ -88,7 +88,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
             // Satori requires an explicit display on any element with more than
             // one child, so this is built as a single string rather than
             // interpolated fragments.
-            <div style={{ display: 'flex', fontSize: 30, color: '#8FE0B3' }}>
+            <div style={{ display: 'flex', fontSize: 30, color: '#7FE8C9' }}>
               {`Best right now: ${best.quote.providerName}${
                 comparison?.savingVsBank
                   ? ` · ${formatPkrForCard(comparison.savingVsBank)} more than a bank`
@@ -103,8 +103,8 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
             display: 'flex',
             justifyContent: 'space-between',
             fontSize: 24,
-            color: '#99B3A6',
-            borderTop: '1px solid #175A45',
+            color: '#9FD3C1',
+            borderTop: '1px solid #0E644B',
             paddingTop: 22,
           }}
         >
