@@ -274,7 +274,7 @@ describe('message composition', () => {
     const message = composeTriggerMessage(context, 'email')
     expect(message.text).toContain('/alerts/unsubscribe/')
     expect(message.text).toContain('/alerts/manage/')
-    expect(message.html).toContain('Pak<span style="color:#e9b44c">Remits</span>')
+    expect(message.html).toContain('Pak<span style="color:#e0a513">Remits</span>')
     expect(message.headers?.['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click')
     expect(message.html).toContain('Unsubscribe from this alert</a>')
   })

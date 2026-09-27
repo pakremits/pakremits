@@ -123,9 +123,9 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
       <SiteHeader locale={locale} />
 
       <main>
-        <div className="bg-[#0b3d2e] px-0 pt-10 pb-24 text-[#f3f6f4]">
+        <div className="bg-[#024e38] px-0 pt-10 pb-24 text-[#f3f6f4]">
           <div className="mx-auto max-w-[1120px] px-6">
-            <nav aria-label="Breadcrumb" className="text-[13px] text-[#99B3A6]">
+            <nav aria-label="Breadcrumb" className="text-[13px] text-[#9fd3c1]">
               <ol className="flex items-center gap-2">
                 <li>
                   <Link href="/" className="no-underline hover:text-white">
@@ -133,7 +133,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
                   </Link>
                 </li>
                 <li aria-hidden="true">/</li>
-                <li className="text-[#C9D9D0]">{currency} to PKR</li>
+                <li className="text-[#cdeee2]">{currency} to PKR</li>
               </ol>
             </nav>
 
@@ -146,7 +146,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
                 <div className="font-display text-[clamp(48px,8vw,84px)] leading-none font-semibold tabular-nums text-white">
                   {latest?.toFixed(2) ?? '—'}
                 </div>
-                <p className="mt-2 text-[15px] text-[#B2C6BC]">
+                <p className="mt-2 text-[15px] text-[#b7e4d4]">
                   Mid-market reference for 1 {currency}. No provider gives you this rate — it is the
                   line they are measured against.
                 </p>
@@ -155,13 +155,13 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
               <dl className="flex gap-8">
                 {windows.map((window) => (
                   <div key={window.label}>
-                    <dt className="text-[13px] text-[#99B3A6]">{window.label}</dt>
+                    <dt className="text-[13px] text-[#9fd3c1]">{window.label}</dt>
                     <dd
                       className="mt-1 font-display text-xl font-semibold tabular-nums"
                       style={{
                         color:
                           window.value === null
-                            ? '#B2C6BC'
+                            ? '#b7e4d4'
                             : window.value >= 0
                               ? 'var(--color-up)'
                               : 'var(--color-down)',
@@ -181,7 +181,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
         <div className="mx-auto max-w-[1120px] px-6">
           {/* Best right now */}
           {best && comparison && (
-            <section className="relative -mt-14 rounded-panel-lg border border-line bg-surface p-7 shadow-[0_40px_80px_-40px_rgba(11,61,46,.35)]">
+            <section className="relative -mt-14 rounded-panel-lg border border-line bg-surface p-7 shadow-[0_40px_80px_-40px_rgba(2,78,56,.35)]">
               <h2 className="text-[13px] font-medium text-faint">Best right now</h2>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-5">
                 <div className="flex items-center gap-4">
@@ -211,7 +211,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
 
                 <Link
                   href={corridorPath(corridor.slug)}
-                  className="flex h-11 items-center rounded-control bg-[#1c7c54] px-5 font-medium text-white no-underline hover:bg-[#166944]"
+                  className="flex h-11 items-center rounded-control bg-brand px-5 font-medium text-white no-underline hover:bg-brand-hover"
                 >
                   Compare all services
                 </Link>

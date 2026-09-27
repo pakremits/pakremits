@@ -98,10 +98,10 @@ export default async function AdminQuotesPage() {
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
                       q.stale
-                        ? 'bg-[#FBF4E3] text-[#8A6420]'
+                        ? 'bg-gold-bg text-gold-dark'
                         : q.source === 'manual'
-                          ? 'bg-[#F1EAFB] text-[#7A4EB8]'
-                          : 'bg-[#E4F3EB] text-[#1C6B4A]'
+                          ? 'bg-promo-bg text-promo'
+                          : 'bg-icon-bg text-ok'
                     }`}
                   >
                     {q.stale ? 'stale' : q.source}

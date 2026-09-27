@@ -184,7 +184,7 @@ export function ResultsView({
               className={`flex-1 cursor-pointer px-3 py-3 text-[15px] font-bold whitespace-nowrap sm:flex-none sm:px-6 sm:text-[16px]
                           transition-colors ${
                             sort === value
-                              ? 'bg-[#8DA63A] text-white'
+                              ? 'bg-brand text-white'
                               : 'bg-surface text-ink-2 hover:bg-tint hover:text-tint-ink'
                           }`}
             >
@@ -241,7 +241,7 @@ export function ResultsView({
               key={q.providerSlug}
               className={`relative grid items-center gap-5 rounded-[14px] border bg-surface p-5 sm:p-7
                           lg:grid-cols-[1.7fr_.8fr_.8fr_1.4fr_220px] lg:gap-6 ${
-                            isBest ? 'border-[3px] border-[#E2B55A]' : 'border-line'
+                            isBest ? 'border-[3px] border-gold' : 'border-line'
                           }`}
             >
               {isBest && (
@@ -254,14 +254,14 @@ export function ResultsView({
                   <path
                     d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"
                     fill="var(--color-gold)"
-                    stroke="#8A6420"
+                    stroke="#7a5a06"
                     strokeWidth="1.2"
                     strokeLinejoin="round"
                   />
-                  <rect x="5" y="19" width="14" height="2" rx="1" fill="#8A6420" />
-                  <circle cx="3" cy="8" r="1.4" fill="var(--color-gold)" stroke="#8A6420" strokeWidth="0.8" />
-                  <circle cx="12" cy="5" r="1.4" fill="var(--color-gold)" stroke="#8A6420" strokeWidth="0.8" />
-                  <circle cx="21" cy="8" r="1.4" fill="var(--color-gold)" stroke="#8A6420" strokeWidth="0.8" />
+                  <rect x="5" y="19" width="14" height="2" rx="1" fill="#7a5a06" />
+                  <circle cx="3" cy="8" r="1.4" fill="var(--color-gold)" stroke="#7a5a06" strokeWidth="0.8" />
+                  <circle cx="12" cy="5" r="1.4" fill="var(--color-gold)" stroke="#7a5a06" strokeWidth="0.8" />
+                  <circle cx="21" cy="8" r="1.4" fill="var(--color-gold)" stroke="#7a5a06" strokeWidth="0.8" />
                 </svg>
               )}
               {/* Provider. Below lg the card stacks: provider, amount, a detail box
@@ -433,8 +433,8 @@ export function ResultsView({
                     href={`${staticPath('how-we-rank', locale as Locale)}#bank-benchmark`}
                     className="flex h-[54px] w-full items-center justify-center rounded-[8px] border-[1.5px]
                                border-line bg-surface text-[16px] font-medium text-ink no-underline
-                               transition-[border-color,box-shadow] hover:border-[#85A61C]
-                               hover:shadow-[0_0_0_1.5px_#85A61C]"
+                               transition-[border-color,box-shadow] hover:border-accent
+                               hover:shadow-[0_0_0_1.5px_var(--color-accent)]"
                   >
                     {t('whySoLow')}
                   </Link>
@@ -446,8 +446,8 @@ export function ResultsView({
                     className={`flex h-[54px] w-full items-center justify-center gap-2 rounded-[8px]
                                 text-[16px] font-bold whitespace-nowrap no-underline transition-colors ${
                                   isBest
-                                    ? 'bg-gold text-on-gold hover:bg-[#DDA73C]'
-                                    : 'border-[1.5px] border-line bg-surface text-ink hover:border-[#85A61C] hover:shadow-[0_0_0_1.5px_#85A61C]'
+                                    ? 'bg-gold text-on-gold hover:bg-gold-hover'
+                                    : 'border-[1.5px] border-line bg-surface text-ink hover:border-accent hover:shadow-[0_0_0_1.5px_var(--color-accent)]'
                                 }`}
                   >
                     {t('sendWith', { provider: q.providerName.split(' ')[0] })}

@@ -192,7 +192,7 @@ export function RateAlertDialog({
               aria-label={t('close')}
               className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-[10px]
                          border-[3px] border-line text-ink transition-[border-color,box-shadow]
-                         hover:border-[#85A61C]"
+                         hover:border-accent"
             >
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-3.5 w-3.5" aria-hidden="true">
                 <path d="M4 4l8 8M12 4l-8 8" />
@@ -201,7 +201,7 @@ export function RateAlertDialog({
           </div>
 
           {status.kind === 'ok' ? (
-            <div className="mt-6 rounded-[12px] border-s-4 border-[#85A61C] bg-tint px-5 py-4" role="status">
+            <div className="mt-6 rounded-[12px] border-s-4 border-accent bg-tint px-5 py-4" role="status">
               <h3 className="text-[18px] font-bold text-tint-ink">
                 {status.needsConfirmation ? t('checkInbox') : t('alertSet')}
               </h3>
@@ -238,7 +238,7 @@ export function RateAlertDialog({
                 <label htmlFor="alert-rate" className={`${labelClass} mt-6`}>
                   {t('targetRate')}
                 </label>
-                <div className="flex h-[58px] rounded-[8px] border-[3px] border-[#85A61C]">
+                <div className="flex h-[58px] rounded-[8px] border-[3px] border-accent">
                   <input
                     id="alert-rate"
                     name="targetRate"
@@ -271,7 +271,7 @@ export function RateAlertDialog({
 
                 {/* What the alert will look like when it lands. */}
                 <div
-                  className="mt-5 rounded-[12px] border-s-4 border-[#85A61C] bg-tint px-5 py-3.5"
+                  className="mt-5 rounded-[12px] border-s-4 border-accent bg-tint px-5 py-3.5"
                   aria-hidden="true"
                 >
                   <div className="text-[14px] font-medium text-tint-ink">{t('previewSender')}</div>
@@ -288,7 +288,7 @@ export function RateAlertDialog({
                   <input
                     type="checkbox"
                     name="wantsDigest"
-                    className="h-[18px] w-[18px] shrink-0 cursor-pointer accent-[#85A61C]"
+                    className="h-[18px] w-[18px] shrink-0 cursor-pointer accent-accent"
                   />
                   {t('digestOptIn')}
                 </label>
@@ -310,7 +310,7 @@ export function RateAlertDialog({
                   type="submit"
                   disabled={status.kind === 'sending' || !turnstileToken}
                   className="mt-4 h-[58px] w-full cursor-pointer rounded-[8px] bg-gold text-[20px] font-bold
-                             text-on-gold transition-colors hover:bg-[#DDA73C] disabled:cursor-not-allowed
+                             text-on-gold transition-colors hover:bg-gold-hover disabled:cursor-not-allowed
                              disabled:opacity-60"
                 >
                   {status.kind === 'sending' ? t('creating') : t('createAlert')}

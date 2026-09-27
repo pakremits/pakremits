@@ -225,7 +225,7 @@ export function CompareSearch({
       <label htmlFor={ids.amount} className={label}>
         {t('youSend')}
       </label>
-      <div className={`flex ${fieldHeight} rounded-[8px] border-[3px] border-[#85A61C]`}>
+      <div className={`flex ${fieldHeight} rounded-[8px] border-[3px] border-accent`}>
         <input
           id={ids.amount}
           value={amountText}
@@ -257,7 +257,7 @@ export function CompareSearch({
     <button
       type="submit"
       className={`${fieldHeight} w-full cursor-pointer rounded-[8px] bg-gold font-display font-bold text-on-gold
-                  transition-colors hover:bg-[#DDA73C] focus:outline-none focus-visible:outline-none
+                  transition-colors hover:bg-gold-hover focus:outline-none focus-visible:outline-none
                   active:scale-[.985] lg:w-auto ${row ? 'px-8 text-[19px]' : 'px-10 text-[20px]'}`}
     >
       {t('compareShort')}

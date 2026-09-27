@@ -52,7 +52,7 @@ export async function SiteHeader({
       <div className="mx-auto flex h-[86px] max-w-[1120px] items-center justify-between gap-4 px-6 lg:gap-6">
         <div className="flex min-w-0 items-center gap-5 xl:gap-6">
           <ScrollTopLink href={localePath(locale, '/')} className="flex shrink-0 items-center no-underline">
-            {/* Inked in the hero greens for a white bar. See public/pakrimits-new-logo.svg.
+            {/* The brand-sheet logo, teal and gold for a white bar. See public/pakrimits-new-logo.svg.
 
                 Plain <img>, not next/image: the source is a static SVG, which the
                 image optimiser passes through untouched anyway and only serves
@@ -61,18 +61,18 @@ export async function SiteHeader({
             <img
               src="/pakrimits-new-logo.svg"
               alt="PakRemits"
-              width={182}
-              height={50}
-              className="h-8 w-auto sm:h-[50px] lg:h-10 xl:h-[50px] dark:hidden"
+              width={185}
+              height={36}
+              className="h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:hidden"
             />
             {/* Dark theme: same mark, light wordmark. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/pakrimits-new-logo-dark.svg"
               alt="PakRemits"
-              width={182}
-              height={50}
-              className="hidden h-8 w-auto sm:h-[50px] lg:h-10 xl:h-[50px] dark:block"
+              width={185}
+              height={36}
+              className="hidden h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:block"
             />
           </ScrollTopLink>
 
@@ -126,7 +126,7 @@ export async function SiteHeader({
             href={`${localePath(locale, '/')}#alerts`}
             className="flex h-12 items-center rounded-[10px] border border-line bg-surface px-3.5 max-[359px]:hidden
                        text-[14px] font-semibold sm:text-[15px] whitespace-nowrap text-ink no-underline
-                       transition-[border-color,box-shadow] hover:border-[#85A61C] hover:shadow-[0_0_0_2px_#85A61C] sm:px-6"
+                       transition-[border-color,box-shadow] hover:border-accent hover:shadow-[0_0_0_2px_var(--color-accent)] sm:px-6"
           >
             {t('setAlert')}
           </Link>
@@ -192,17 +192,17 @@ export async function SiteFooter({ locale = 'en' }: { locale?: Locale }) {
               <img
                 src="/pakrimits-new-logo.svg"
                 alt="PakRemits"
-                width={182}
-                height={50}
-                className="h-[50px] w-auto dark:hidden"
+                width={185}
+                height={36}
+                className="h-9 w-auto dark:hidden"
               />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/pakrimits-new-logo-dark.svg"
                 alt="PakRemits"
-                width={182}
-                height={50}
-                className="hidden h-[50px] w-auto dark:block"
+                width={185}
+                height={36}
+                className="hidden h-9 w-auto dark:block"
               />
             </Link>
             {/* Affiliate disclosure. Required on every page carrying provider

@@ -215,7 +215,7 @@ export default async function ComparePage({
             href={`${localePath(locale, '/')}#alerts`}
             className="flex min-w-[120px] flex-col items-center justify-center gap-1.5 rounded-[14px]
                        border border-line bg-surface px-5 py-4 text-[15px] font-medium text-ink
-                       no-underline transition-[border-color,box-shadow] hover:border-[#85A61C] hover:shadow-[0_0_0_2px_#85A61C]"
+                       no-underline transition-[border-color,box-shadow] hover:border-accent hover:shadow-[0_0_0_2px_var(--color-accent)]"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
               <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" />

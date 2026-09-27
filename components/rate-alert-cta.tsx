@@ -43,8 +43,8 @@ export function RateAlertCta({
         href={`${localePath(locale, '/')}#alerts`}
         className="flex h-[58px] shrink-0 items-center justify-center rounded-[8px] bg-gold px-12
                    text-[19px] font-bold whitespace-nowrap text-on-gold no-underline
-                   shadow-[0_10px_30px_-8px_rgba(233,180,76,.55)] transition-colors
-                   hover:bg-[#DDA73C] lg:w-auto"
+                   shadow-[0_10px_30px_-8px_rgba(224,165,19,.55)] transition-colors
+                   hover:bg-gold-hover lg:w-auto"
       >
         {button}
       </Link>

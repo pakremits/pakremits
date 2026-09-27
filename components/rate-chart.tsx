@@ -79,7 +79,7 @@ export function RateChart({ points, currency, label, height = 220 }: RateChartPr
           </b>
           <span
             className="text-[13px] tabular-nums"
-            style={{ color: rising ? '#1C6B4A' : '#A32D2D' }}
+            style={{ color: rising ? 'var(--color-ok)' : 'var(--color-danger)' }}
           >
             {rising ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}% over the period
           </span>

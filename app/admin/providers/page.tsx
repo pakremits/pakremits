@@ -97,7 +97,7 @@ export default async function AdminProvidersPage() {
                 <span
                   className={`rounded-full px-2.5 py-1 text-[12px] ${
                     provider.affiliateUrlTemplate
-                      ? 'bg-[#E4F3EB] text-[#1C6B4A]'
+                      ? 'bg-[#dcf5ec] text-[#037252]'
                       : 'bg-gold-bg text-gold-dark'
                   }`}
                 >

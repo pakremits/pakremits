@@ -9,7 +9,7 @@ export type PayoutOption =
   | 'cash'
   | 'rda'
 
-const flagClass = 'h-5 w-7 rounded-[4px] shadow-[0_0_0_1px_rgba(11,61,46,.12)]'
+const flagClass = 'h-5 w-7 rounded-[4px] shadow-[0_0_0_1px_rgba(2,78,56,.12)]'
 
 export function CountryFlag({ countryCode }: { countryCode: string }) {
   if (countryCode === 'GB') {
