@@ -332,9 +332,12 @@ export function ResultsView({
               {/* Recipient gets */}
               <div className="tabular-nums">
                 <div className="text-[13.5px] text-muted list-view:hidden">{t('columnReceives')}</div>
-                {/* The struck-through lowest sits before the amount on the same
-                    line; it wraps above it only where the column is too narrow. */}
+                {/* The struck-through lowest follows the amount on the same line;
+                    it wraps below it only where the column is too narrow. */}
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1.5 list-view:gap-x-2">
+                  <b className="block font-display text-[28px] leading-none font-semibold tracking-[-0.02em]">
+                    {formatPkr(q.amountReceived)}
+                  </b>
                   {isBest && lowestReceived !== null && lowestReceived < q.amountReceived && (
                     <span className="font-display text-[17px] leading-none font-semibold text-muted list-view:text-[14px]">
                       <span className="sr-only">
@@ -345,9 +348,6 @@ export function ResultsView({
                       </s>
                     </span>
                   )}
-                  <b className="block font-display text-[28px] leading-none font-semibold tracking-[-0.02em]">
-                    {formatPkr(q.amountReceived)}
-                  </b>
                 </div>
                 <div className="my-3 h-1.5 overflow-hidden rounded-full bg-line-2">
                   <i
