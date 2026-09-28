@@ -19,7 +19,9 @@ export function ProviderLogo({
   brandTextColor,
   size = 'default',
 }: ProviderLogoProps) {
-  const sizeClass =
+  // shrink-0: beside long text in a flex row the square would otherwise be
+  // squeezed into an oval.
+  const sizeClass = `shrink-0 ${
     size === 'hero'
       ? 'h-16 w-16'
       : size === 'large'
@@ -27,6 +29,7 @@ export function ProviderLogo({
         : size === 'small'
           ? 'h-10 w-10'
           : 'h-11 w-11'
+  }`
 
   if (providerSlug === 'remitly') {
     return (

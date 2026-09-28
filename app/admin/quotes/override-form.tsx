@@ -3,14 +3,14 @@
 import { useActionState } from 'react'
 import { DELIVERY_METHODS } from '@/lib/db/schema'
 import { type OverrideState, saveManualQuote } from './actions'
+import { BUTTON_PRIMARY, FIELD_BASE } from '@/components/admin-chrome'
 
 interface Props {
   providers: { id: number; name: string }[]
   corridors: { id: number; name: string; currency: string }[]
 }
 
-const FIELD = 'h-11 w-full rounded-control border-[1.5px] border-line bg-white px-3 text-ink ' +
-  'focus:border-leaf focus:outline-none focus:ring-4 focus:ring-leaf/15'
+const FIELD = `${FIELD_BASE} h-11 px-3`
 
 export function OverrideForm({ providers, corridors }: Props) {
   const [state, formAction, pending] = useActionState<OverrideState, FormData>(
@@ -19,7 +19,8 @@ export function OverrideForm({ providers, corridors }: Props) {
   )
 
   return (
-    <form action={formAction} className="mt-6 rounded-panel border border-line bg-white p-6">
+    <form action={formAction} className="rounded-panel-lg bg-surface p-6 shadow-[0_10px_30px_-18px_rgba(0,0,0,.28)]">
+      <h2 className="mb-4 font-display text-[17px] font-semibold text-ink">Add a manual quote</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className="block">
           <span className="mb-1.5 block text-sm text-muted">Provider</span>
@@ -106,8 +107,7 @@ export function OverrideForm({ providers, corridors }: Props) {
         <button
           type="submit"
           disabled={pending}
-          className="h-11 rounded-control bg-leaf px-6 font-medium text-white
-                     hover:bg-leaf-dark disabled:opacity-60"
+          className={`${BUTTON_PRIMARY} h-11 px-6 text-[15px]`}
         >
           {pending ? 'Saving…' : 'Save override'}
         </button>
@@ -115,7 +115,7 @@ export function OverrideForm({ providers, corridors }: Props) {
         {/* aria-live so the result is announced, not just shown. */}
         <p
           aria-live="polite"
-          className={`text-sm ${state?.ok === false ? 'text-[#A32D2D]' : 'text-leaf'}`}
+          className={`text-sm font-medium ${state?.ok === false ? 'text-danger' : 'text-ok'}`}
         >
           {state?.message}
         </p>

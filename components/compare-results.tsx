@@ -36,14 +36,18 @@ const SORT_LABEL_KEY: Record<SortKey, 'sortReceived' | 'sortFastest' | 'sortLowe
 
 /** Shared pill shape so every badge and the speed chip match in height,
  *  padding and text size. */
-const BADGE = 'inline-flex h-6 items-center gap-1 rounded-full px-2.5 text-[12px] leading-none'
+const BADGE =
+  'inline-flex h-6 max-w-full items-center gap-1 rounded-full px-2.5 text-[12px] leading-none whitespace-nowrap'
+
+/** Longest label that still reads as a pill; anything longer is summarised. */
+const PILL_MAX = 18
 
 /** The desktop columns, shared by the headings, the cards and the skeleton. */
 const COLUMNS = 'list-view:grid-cols-[1.4fr_.7fr_.7fr_1.9fr_220px]'
 
 /** Stacked (phone and grid view), the last row takes any spare height so the
  *  buttons line up along a grid row; at list-view the card is a single row. */
-const CARD = `relative grid grid-rows-[auto_auto_auto_1fr] items-center gap-5 list-view:grid-rows-none rounded-[14px] border p-5 sm:p-7 ${COLUMNS} list-view:gap-6`
+const CARD = `relative grid grid-rows-[auto_auto_auto_1fr] items-center gap-5 list-view:grid-rows-none rounded-[14px] p-5 sm:p-7 ${COLUMNS} list-view:gap-6`
 
 /** 0.0075 -> "+0.75%", -0.0042 -> "−0.42%". */
 function signedPercent(fraction: number): string {
@@ -150,7 +154,9 @@ export function ResultsView({
   const layout = useResultsLayout()
 
   const speedLabel = (minutes: number | null, fallback: string): string => {
-    if (locale === 'en') return fallback
+    // The provider's own wording when it is short ("3–5 days"); a sentence such
+    // as "Typically available in minutes" gets our bucket instead.
+    if (locale === 'en' && fallback && fallback.length <= PILL_MAX) return fallback
     if (minutes === null) return t('speedVaries')
     if (minutes <= 30) return t('speedMinutes')
     if (minutes <= 360) return t('speedHours')
@@ -230,8 +236,10 @@ export function ResultsView({
             <li
               key={q.providerSlug}
               className={`${CARD} ${
-                            // The best deal wears the site's hover tint.
-                            isBest ? 'border-[3px] border-gold bg-tint' : 'border-line bg-surface'
+                            // The best deal wears the site's hover tint and the only
+                            // visible border; the rest keep a clear one of the same
+                            // width so every card's content lines up.
+                            isBest ? 'border-[3px] border-gold bg-tint' : 'border-[3px] border-transparent bg-surface'
                           }`}
             >
               {isBest && (
@@ -286,8 +294,14 @@ export function ResultsView({
                       </span>
                     )}
                     {q.promo && q.promoNote && (
-                      <span className={`${BADGE} bg-promo-bg text-promo`}>
-                        <bdi>{promoLabel(q.promoNote)}</bdi>
+                      <span className={`${BADGE} bg-promo-bg font-semibold text-promo`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 shrink-0" aria-hidden="true">
+                          <path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" />
+                          <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none" />
+                        </svg>
+                        <bdi>
+                          {promoLabel(q.promoNote).length <= PILL_MAX ? promoLabel(q.promoNote) : t('promoOffer')}
+                        </bdi>
                       </span>
                     )}
                     {q.stale && (
@@ -296,6 +310,17 @@ export function ResultsView({
                       </span>
                     )}
                   </div>
+                  {/* A promo too long for its pill is spelled out here, as text. */}
+                  {q.promo && q.promoNote && promoLabel(q.promoNote).length > PILL_MAX && (
+                    // Clamped to two lines in the narrow list column; the title
+                    // keeps the whole offer one hover away.
+                    <p
+                      title={promoLabel(q.promoNote)}
+                      className="mt-1.5 line-clamp-2 max-w-[36ch] text-[13px] leading-snug text-promo"
+                    >
+                      <bdi>{promoLabel(q.promoNote)}</bdi>
+                    </p>
+                  )}
                   <div className="mt-1.5 hidden flex-wrap items-center gap-2 text-[14px] text-muted list-view:flex">
                     {q.isBenchmark ? t('swiftTransfer') : t('bankDeposit')}
                     <span
@@ -480,7 +505,7 @@ function SortPills({ sort, onSort }: { sort: SortKey; onSort?: (sort: SortKey) =
       // longer than the English.
       // Segmented control: the grey backing shows through the 3px gaps as
       // dividers, matching the field borders.
-      className="flex w-full gap-[3px] overflow-hidden rounded-[10px] border-[3px] border-line bg-line sm:w-auto"
+      className="flex w-full gap-[3px] overflow-hidden rounded-[10px] bg-line sm:w-auto"
       role="group"
       aria-label={t('sortBy')}
     >
@@ -582,7 +607,7 @@ function LayoutToggle({
   return (
     <div
       // Same segmented shape as the sort pills.
-      className="hidden shrink-0 gap-[3px] overflow-hidden rounded-[10px] border-[3px] border-line bg-line lg:flex"
+      className="hidden shrink-0 gap-[3px] overflow-hidden rounded-[10px] bg-line lg:flex"
       role="group"
       aria-label={t('viewAs')}
     >
@@ -652,7 +677,14 @@ const SKELETON_ROWS = [
  * control, columns and card layout (stacked below lg, a row at lg), with bars
  * sized to the text each one replaces.
  */
-export function ResultsSkeleton({ className = '' }: { className?: string }) {
+export function ResultsSkeleton({
+  className = '',
+  showCapturedAt = false,
+}: {
+  className?: string
+  /** Match a ResultsView that prints "Quotes captured …" under its heading. */
+  showCapturedAt?: boolean
+}) {
   const t = useTranslations('panel')
 
   return (
@@ -661,7 +693,10 @@ export function ResultsSkeleton({ className = '' }: { className?: string }) {
         {t('comparing')}
       </p>
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-        <h2 className="font-display text-[26px] font-semibold text-ink">{t('resultsHeading')}</h2>
+        <div>
+          <h2 className="font-display text-[26px] font-semibold text-ink">{t('resultsHeading')}</h2>
+          {showCapturedAt && <Bone className="mt-1.5 h-[18px] w-44" />}
+        </div>
         {/* The new page always opens on the default sort. */}
         <div className="flex w-full items-center gap-3 sm:w-auto">
           <SortPills sort="received" />
@@ -673,7 +708,7 @@ export function ResultsSkeleton({ className = '' }: { className?: string }) {
 
       <ul className="mt-7 grid gap-4 list-view:mt-3" aria-hidden="true">
         {SKELETON_ROWS.map((row, index) => (
-          <li key={index} className={`${CARD} border-line bg-surface`}>
+          <li key={index} className={`${CARD} border-[3px] border-transparent bg-surface`}>
             {/* Provider */}
             <div className="flex items-center gap-4 border-b border-line pb-5 list-view:border-0 list-view:pb-0">
               <span className="skeleton block h-10 w-10 shrink-0 rounded-[12px]" />

@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { type SettingsState, saveAffiliateSettings } from './actions'
+import { BUTTON_PRIMARY, FIELD_BASE } from '@/components/admin-chrome'
 
 interface Props {
   provider: {
@@ -24,9 +25,7 @@ const EXAMPLES: Record<string, string> = {
   none: '',
 }
 
-const FIELD =
-  'h-10 w-full rounded-control border-[1.5px] border-line bg-white px-3 text-[14px] text-ink ' +
-  'focus:border-leaf focus:outline-none focus:ring-4 focus:ring-leaf/15'
+const FIELD = `${FIELD_BASE} h-11 px-3 text-[14px]`
 
 export function AffiliateForm({ provider }: Props) {
   const [state, formAction, pending] = useActionState<SettingsState, FormData>(
@@ -85,14 +84,13 @@ export function AffiliateForm({ provider }: Props) {
         <button
           type="submit"
           disabled={pending}
-          className="h-9 rounded-control bg-leaf px-4 text-[13.5px] font-medium text-white
-                     hover:bg-leaf-dark disabled:opacity-60"
+          className={`${BUTTON_PRIMARY} h-10 px-5 text-[14px]`}
         >
           {pending ? 'Saving…' : 'Save'}
         </button>
         <p
           aria-live="polite"
-          className={`text-[13px] ${state?.ok === false ? 'text-[#A32D2D]' : 'text-leaf'}`}
+          className={`text-[13px] font-medium ${state?.ok === false ? 'text-danger' : 'text-ok'}`}
         >
           {state?.message}
         </p>

@@ -33,12 +33,12 @@ export default async function ConfirmUnsubscribePage({
             <input type="hidden" name="confirm" value="1" />
             <button
               type="submit"
-              className="inline-flex h-12 cursor-pointer items-center rounded-control bg-leaf px-6 font-medium text-white hover:bg-leaf-dark"
+              className="inline-flex h-12 cursor-pointer items-center rounded-control border-[1.5px] border-danger/40 px-6 font-bold text-danger transition-colors hover:border-danger hover:bg-danger-bg"
             >
               Yes, unsubscribe
             </button>
           </form>
-          <Link href={`/alerts/manage/${token}`} className="mt-5 inline-block text-leaf underline underline-offset-2">
+          <Link href={`/alerts/manage/${token}`} className="mt-5 inline-block font-semibold text-leaf underline underline-offset-2">
             Keep this alert
           </Link>
         </article>

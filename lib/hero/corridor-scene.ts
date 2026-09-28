@@ -8,6 +8,8 @@
  * single still frame under prefers-reduced-motion.
  */
 
+import type { CountryDots } from '@/lib/hero/country-dots'
+
 export interface HeroColors {
   /** Darkest band stop. */
   deep: string
@@ -29,6 +31,15 @@ export interface HeroCorridor {
   detail?: string
 }
 
+/**
+ * Two-country mode: the world map with only the sending country and Pakistan
+ * drawn, each where and as large as it really is on the flat map.
+ */
+export interface ScenePair {
+  from: CountryDots
+  to: CountryDots
+}
+
 /** The Pakistan marker's tooltip. */
 export interface HeroHome {
   label: string
@@ -41,6 +52,16 @@ export interface CorridorSceneOptions {
   corridors: HeroCorridor[]
   /** Without it the Pakistan marker has no hover state. */
   home?: HeroHome
+  /** Where Pakistan sits in the band, as fractions of width and height.
+   *  Defaults to the home hero's HOME_X / HOME_Y. */
+  homeAt?: { x: number; y: number }
+  /** Centre of the legibility veil behind the text, as fractions. Defaults to
+   *  the home hero's centred headline. */
+  veilAt?: { x: number; y: number }
+  /** Draw two country silhouettes instead of the world map. */
+  pair?: ScenePair
+  /** Pair mode: told Pakistan's drawn bounds (canvas px) after every layout. */
+  onHomeBounds?: (bounds: { left: number; right: number; top: number; bottom: number }) => void
   /** Element that receives pointer events. Defaults to the canvas's parent. */
   eventTarget?: HTMLElement | null
   /** Pointer events for which this returns true are treated as leaving the map. */
@@ -77,6 +98,28 @@ function land(lon: number, lat: number) {
   if (y < 0 || y >= MH) return false
   const i = y * MW + x
   return (MASK[i >> 3] >> (7 - (i & 7))) & 1
+}
+
+/** Whether a longitude/latitude falls on a land cell of a country grid. */
+function inGrid(grid: CountryDots, lon: number, lat: number): boolean {
+  const [w, south, e, n] = grid.bbox
+  if (lon < w || lon >= e || lat <= south || lat > n) return false
+  const col = Math.floor(((lon - w) / (e - w)) * grid.cols)
+  const row = Math.floor(((n - lat) / (n - south)) * grid.rows)
+  const i = row * grid.cols + col
+  return ((decodeBits(grid.bits)[i >> 3] >> (7 - (i & 7))) & 1) === 1
+}
+
+const decoded = new Map<string, Uint8Array>()
+function decodeBits(base64: string): Uint8Array {
+  let bytes = decoded.get(base64)
+  if (!bytes) {
+    const bin = atob(base64)
+    bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    decoded.set(base64, bytes)
+  }
+  return bytes
 }
 
 type RGB = [number, number, number]
@@ -136,7 +179,9 @@ export function createCorridorScene(canvas: HTMLCanvasElement, opts: CorridorSce
   let last = 0
   let t = reduce ? 3 : 0
   let spacing = 8
-  let dots: { x: number; y: number }[] = []
+  let dots: { x: number; y: number; r: number }[] = []
+  /** Where Pakistan (Lahore) is drawn; the world map's or the silhouette's. */
+  let homePt = { x: 0, y: 0 }
   let arcs: Arc[] = []
   const packets: Packet[] = []
   const pointer = { x: -1e4, y: -1e4, sx: -1e4, sy: -1e4, active: 0, target: 0 }
@@ -169,18 +214,38 @@ export function createCorridorScene(canvas: HTMLCanvasElement, opts: CorridorSce
     }
     // Whole world on wide screens, zoomed on Pakistan and the Gulf on narrow ones.
     s = Math.max(W / 360, (H * 0.85) / MH)
-    hx = HOME_X * W
+    hx = (opts.homeAt?.x ?? HOME_X) * W
     // Never leave empty band above the mask's northern edge.
-    hy0 = Math.min(HOME_Y * H, (LAT_TOP - HOME.lat) * s)
+    hy0 = Math.min((opts.homeAt?.y ?? HOME_Y) * H, (LAT_TOP - HOME.lat) * s)
     spacing = Math.max(6, Math.min(11, W / 150))
+    if (opts.pair) zoomToPair(opts.pair)
     dots = []
-    for (let y = spacing / 2; y < H; y += spacing)
-      for (let x = spacing / 2; x < W; x += spacing) {
-        const lon = HOME.lon + (x - hx) / s
+    const pair = opts.pair
+    const step = spacing
+    const radius = pair ? spacing * 0.2 : spacing * 0.17
+    const onMap = pair
+      ? (lon: number, lat: number) => inGrid(pair.from, lon, lat) || inGrid(pair.to, lon, lat)
+      : land
+    for (let y = step / 2; y < H; y += step)
+      for (let x = step / 2; x < W; x += step) {
+        const lon = wrap(HOME.lon + (x - hx) / s)
         const lat = HOME.lat - (y - hy0) / s
-        if (land(lon, lat)) dots.push({ x, y })
+        if (onMap(lon, lat)) dots.push({ x, y, r: radius })
       }
-    const h = proj(HOME.lon, HOME.lat)
+    if (pair && opts.onHomeBounds) {
+      const b = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity }
+      for (let y = step / 2; y < H; y += step)
+        for (let x = step / 2; x < W; x += step) {
+          if (!inGrid(pair.to, wrap(HOME.lon + (x - hx) / s), HOME.lat - (y - hy0) / s)) continue
+          b.left = Math.min(b.left, x)
+          b.right = Math.max(b.right, x)
+          b.top = Math.min(b.top, y)
+          b.bottom = Math.max(b.bottom, y)
+        }
+      if (b.left <= b.right) opts.onHomeBounds(b)
+    }
+    homePt = proj(HOME.lon, HOME.lat)
+    const h = homePt
     arcs = corridors.map((c) => {
       const o = proj(c.lon, c.lat)
       const d = Math.hypot(h.x - o.x, h.y - o.y)
@@ -188,6 +253,41 @@ export function createCorridorScene(canvas: HTMLCanvasElement, opts: CorridorSce
       return { x0: o.x, y0: o.y, cx: (o.x + h.x) / 2, cy: Math.min(o.y, h.y) - lift, x1: h.x, y1: h.y, c }
     })
     if (!running) draw(0)
+  }
+
+  /**
+   * Same flat projection, zoomed and centred so the two countries together
+   * fill the band: their real shapes, sizes and positions relative to each
+   * other, just larger.
+   */
+  /** Pair mode: the area the countries are fitted into, when not the band's. */
+  let fitArea: { left: number; width: number; top: number; height: number; alignEnd?: boolean } | null = null
+
+  function zoomToPair(pair: ScenePair) {
+    // Longitudes relative to Pakistan, taking each country's centre through
+    // the same wrap as the map so the USA stays west of it.
+    const box = (g: CountryDots) => {
+      const [w, south, e, n] = g.bbox
+      const centre = wrap((w + e) / 2 - HOME.lon)
+      return { w: centre - (e - w) / 2, e: centre + (e - w) / 2, s: south, n }
+    }
+    const a = box(pair.from)
+    const b = box(pair.to)
+    const west = Math.min(a.w, b.w)
+    const east = Math.max(a.e, b.e)
+    const south = Math.min(a.s, b.s)
+    const north = Math.max(a.n, b.n)
+    // Room at the top for the header strip, at the bottom for the search bar.
+    const { left, width, top, height } = fitArea ?? {
+      left: W * 0.04,
+      width: W * 0.92,
+      top: H * 0.06,
+      height: H * 0.74,
+    }
+    s = Math.min(width / (east - west), height / (north - south))
+    // Centred, or pushed against the area's right edge.
+    hx = fitArea?.alignEnd ? left + width - east * s : left + width / 2 - ((west + east) / 2) * s
+    hy0 = top + height / 2 + ((south + north) / 2 - HOME.lat) * s
   }
 
   const qb = (a: Arc, p: number) => {
@@ -227,7 +327,7 @@ export function createCorridorScene(canvas: HTMLCanvasElement, opts: CorridorSce
     pointer.sy += (pointer.y - pointer.sy) * k
     const act = pointer.active
 
-    const hp = proj(HOME.lon, HOME.lat)
+    const hp = homePt
     // Pakistan wins over a corridor origin: none sits close enough to share it.
     onHome =
       !!opts.home && act > 0.2 && Math.hypot(pointer.x - hp.x, pointer.y - hp.y) < HOME_HIT_RADIUS
@@ -269,14 +369,18 @@ export function createCorridorScene(canvas: HTMLCanvasElement, opts: CorridorSce
       }
       const dh = Math.hypot(d.x - hp.x, d.y - hp.y)
       if (dh < 60) e = Math.max(e, (1 - dh / 60) * 0.6)
-      ctx!.fillStyle = `rgba(255,255,255,${0.16 + e * 0.55})`
+      // Two small silhouettes carry the band, so they can stand out more
+      // than a whole world of dots.
+      ctx!.fillStyle = `rgba(255,255,255,${(opts.pair ? 0.34 : 0.16) + e * 0.55})`
       ctx!.beginPath()
-      ctx!.arc(d.x, d.y, spacing * 0.17 + e * 1.4, 0, Math.PI * 2)
+      ctx!.arc(d.x, d.y, d.r + e * 1.4, 0, Math.PI * 2)
       ctx!.fill()
     }
 
     // Veil behind the headline for legibility.
-    const v = ctx!.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, Math.max(W * 0.42, 300))
+    const vx = (opts.veilAt?.x ?? 0.5) * W
+    const vy = (opts.veilAt?.y ?? 0.4) * H
+    const v = ctx!.createRadialGradient(vx, vy, 0, vx, vy, Math.max(W * 0.42, 300))
     v.addColorStop(0, rgba(deep, 0.55))
     v.addColorStop(1, rgba(deep, 0))
     ctx!.fillStyle = v
@@ -599,7 +703,11 @@ export function createCorridorScene(canvas: HTMLCanvasElement, opts: CorridorSce
   target.addEventListener('pointermove', onMove, { passive: true })
   target.addEventListener('pointerleave', onLeave, { passive: true })
   target.addEventListener('pointerup', onClick)
-  const ro = new ResizeObserver(layout)
+  // A resize starts from the full band again; the owner may narrow it anew.
+  const ro = new ResizeObserver(() => {
+    fitArea = null
+    layout()
+  })
   ro.observe(canvas)
   const io = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting
@@ -611,6 +719,11 @@ export function createCorridorScene(canvas: HTMLCanvasElement, opts: CorridorSce
   update()
 
   return {
+    /** Pair mode: refit the two countries into this area (canvas px). */
+    fitPairInto(area: { left: number; width: number; top: number; height: number; alignEnd?: boolean }) {
+      fitArea = area
+      layout()
+    },
     destroy() {
       stop()
       ro.disconnect()

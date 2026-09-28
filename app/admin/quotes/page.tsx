@@ -1,7 +1,7 @@
 import { desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { corridors, providers, rateQuotes } from '@/lib/db/schema'
-import { AdminNav } from '@/components/admin-chrome'
+import { ADMIN_MAIN, AdminHeader, Panel, TABLE, TD, TH, THEAD_ROW, TR } from '@/components/admin-chrome'
 import { getFormOptions } from './actions'
 import { OverrideForm } from './override-form'
 
@@ -45,58 +45,55 @@ export default async function AdminQuotesPage() {
 
   return (
     <>
-      <AdminNav current="/admin/quotes" />
-      <main className="mx-auto max-w-[1200px] px-6 py-8">
-      <h1 className="font-display text-3xl font-semibold">Quote overrides</h1>
-      <p className="mt-2 max-w-[60ch] text-muted">
-        Manual rows are written with source <code>manual</code> and rank exactly like live quotes.
-        Use this to correct a bad scrape or enter a provider quote when automated collection is
-        unavailable. Named account destinations use general bank-deposit quotes in the public comparison.
-      </p>
-
+      <AdminHeader
+        current="/admin/quotes"
+        title="Quote overrides"
+        lede="Manual rows are written with source manual and rank exactly like live quotes. Use this to correct a bad scrape or enter a provider quote when automated collection is unavailable. Named account destinations use general bank-deposit quotes in the public comparison."
+      />
+      <main className={ADMIN_MAIN}>
       <OverrideForm providers={options.providers} corridors={options.corridors} />
 
-      <h2 className="mt-12 font-display text-xl font-semibold">Last 60 quotes</h2>
-      <div className="mt-4 overflow-x-auto rounded-panel border border-line bg-white">
-        <table className="w-full min-w-[900px] border-collapse text-sm">
+      <Panel title="Last 60 quotes" hint="Newest first, across every provider and corridor." className="mt-5">
+      <div className="overflow-x-auto">
+        <table className={`${TABLE} min-w-[900px]`}>
           <thead>
-            <tr className="border-b border-line text-left text-xs text-faint">
-              <th className="p-3 font-medium">Captured (PKT)</th>
-              <th className="p-3 font-medium">Provider</th>
-              <th className="p-3 font-medium">Corridor</th>
-              <th className="p-3 font-medium">Method</th>
-              <th className="p-3 text-right font-medium">Sent</th>
-              <th className="p-3 text-right font-medium">Rate</th>
-              <th className="p-3 text-right font-medium">Fee</th>
-              <th className="p-3 text-right font-medium">Received</th>
-              <th className="p-3 font-medium">Source</th>
+            <tr className={THEAD_ROW}>
+              <th className={TH}>Captured (PKT)</th>
+              <th className={TH}>Provider</th>
+              <th className={TH}>Corridor</th>
+              <th className={TH}>Method</th>
+              <th className={`${TH} text-right`}>Sent</th>
+              <th className={`${TH} text-right`}>Rate</th>
+              <th className={`${TH} text-right`}>Fee</th>
+              <th className={`${TH} text-right`}>Received</th>
+              <th className={TH}>Source</th>
             </tr>
           </thead>
           <tbody>
             {quotes.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-muted">
+                <td colSpan={9} className="rounded-[12px] bg-mist p-6 text-center text-muted">
                   No quotes yet. Run <code>npm run seed</code> then <code>npm run refresh</code>.
                 </td>
               </tr>
             )}
             {quotes.map((q) => (
-              <tr key={q.id} className="border-b border-line-2 last:border-0">
-                <td className="p-3 tabular-nums text-muted">{PKT.format(q.capturedAt)}</td>
-                <td className="p-3">{q.provider}</td>
-                <td className="p-3 text-muted">
+              <tr key={q.id} className={TR}>
+                <td className={`${TD} tabular-nums text-muted`}>{PKT.format(q.capturedAt)}</td>
+                <td className={`${TD} font-medium text-ink`}>{q.provider}</td>
+                <td className={`${TD} text-muted`}>
                   {q.corridor} · {q.currency}
                 </td>
-                <td className="p-3 text-muted">{q.method}</td>
-                <td className="p-3 text-right tabular-nums">{q.amountSent}</td>
-                <td className="p-3 text-right tabular-nums">{Number(q.rate).toFixed(4)}</td>
-                <td className="p-3 text-right tabular-nums">{q.fee}</td>
-                <td className="p-3 text-right font-medium tabular-nums">
+                <td className={`${TD} text-muted`}>{q.method}</td>
+                <td className={`${TD} text-right tabular-nums`}>{q.amountSent}</td>
+                <td className={`${TD} text-right tabular-nums`}>{Number(q.rate).toFixed(4)}</td>
+                <td className={`${TD} text-right tabular-nums`}>{q.fee}</td>
+                <td className={`${TD} text-right font-medium tabular-nums`}>
                   ₨ {Number(q.amountReceived).toLocaleString('en-PK')}
                 </td>
-                <td className="p-3">
+                <td className={`${TD}`}>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
+                    className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
                       q.stale
                         ? 'bg-gold-bg text-gold-dark'
                         : q.source === 'manual'
@@ -112,6 +109,7 @@ export default async function AdminQuotesPage() {
           </tbody>
         </table>
       </div>
+      </Panel>
       </main>
     </>
   )

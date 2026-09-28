@@ -27,8 +27,8 @@ export default function AlertRemovedPage() {
           </p>
           <Link
             href="/#alerts"
-            className="mt-7 inline-flex h-12 items-center rounded-control bg-leaf px-6
-                       font-medium text-white no-underline hover:bg-leaf-dark"
+            className="mt-7 inline-flex h-12 items-center rounded-control bg-gold px-6
+                       font-bold text-on-gold no-underline transition-colors hover:bg-gold-hover"
           >
             Set another alert
           </Link>

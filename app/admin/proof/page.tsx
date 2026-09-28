@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
-import { AdminNav, Empty, Panel } from '@/components/admin-chrome'
+import { ADMIN_MAIN, AdminHeader, Empty, Panel, StatusPill } from '@/components/admin-chrome'
 import { proofByDay } from '@/lib/admin/stats'
 import { listBenchmarks } from '@/lib/proof/benchmarks'
 import { evaluateClaims } from '@/lib/proof/claims'
 import { LAUNCH_DATE, THRESHOLDS } from '@/lib/proof/config'
 import { formatProofPkrFull } from '@/lib/proof/format'
 import { getProofStats } from '@/lib/proof/stats'
+import { ColumnChart } from '@/components/admin-charts'
 import { BenchmarkForm } from './benchmark-form'
 
 export const dynamic = 'force-dynamic'
@@ -44,9 +45,18 @@ export default async function AdminProofPage() {
 
   return (
     <>
-      <AdminNav current="/admin/proof" />
+      <AdminHeader
+        current="/admin/proof"
+        title="Proof and savings"
+        lede="The numbers behind every public claim, what the savings are measured against, and the daily rollups the cron writes."
+        status={
+          <StatusPill tone="ok">
+            {claims.filter((claim) => claim.visible).length} of {claims.length} claims live
+          </StatusPill>
+        }
+      />
 
-      <main className="mx-auto max-w-[1200px] space-y-6 px-6 py-8">
+      <main className={`${ADMIN_MAIN} space-y-5`}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Saved since launch" value={formatProofPkrFull(stats.savingsSinceLaunch)} />
           <Stat label="Saved this month" value={formatProofPkrFull(stats.savingsThisMonth)} />
@@ -64,15 +74,13 @@ export default async function AdminProofPage() {
           title="Claims currently visible"
           hint={`Evaluated against live numbers. Launch date ${LAUNCH_DATE.toISOString().slice(0, 10)}.`}
         >
-          <ul className="space-y-2">
+          <ul className="divide-y divide-line-2">
             {claims.map((claim) => (
-              <li key={claim.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <li key={claim.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2.5 first:pt-0 last:pb-0">
                 <span
-                  className={`inline-block w-16 shrink-0 rounded-control px-2 py-0.5 text-center
-                              text-[12px] font-medium ${
-                                claim.visible
-                                  ? 'bg-leaf/15 text-leaf'
-                                  : 'bg-line-2 text-muted'
+                  className={`inline-block w-16 shrink-0 rounded-full px-2 py-0.5 text-center
+                              text-[12px] font-semibold ${
+                                claim.visible ? 'bg-icon-bg text-ok' : 'bg-line-2 text-muted'
                               }`}
                 >
                   {claim.visible ? 'live' : 'hidden'}
@@ -97,6 +105,21 @@ export default async function AdminProofPage() {
           {series.length === 0 ? (
             <Empty>No rollup rows yet. The cron writes these at the end of each run.</Empty>
           ) : (
+            <>
+            <div className="mb-6 rounded-[14px] bg-mist p-4 pt-5">
+              <p className="mb-3 text-[13px] font-medium text-muted">Rupees saved per day</p>
+              <ColumnChart
+                caption="Rupees saved per day, last 30 days"
+                unit="saved"
+                formatAs="pkr-short"
+                data={series.map((day) => ({
+                  key: day.date,
+                  label: day.date.slice(8),
+                  detail: `${day.date} · ${day.comparisonsRun} comparisons`,
+                  value: Math.round(day.savingPkrTotal),
+                }))}
+              />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] border-collapse text-[13px]">
                 <thead>
@@ -120,14 +143,14 @@ export default async function AdminProofPage() {
                         {/* A CSS bar rather than a charting library: one column
                             of 30 values does not justify shipping a dependency. */}
                         <span
-                          className="block h-2 rounded-full bg-leaf/70"
+                          className="block h-2 rounded-full bg-bar"
                           style={{
                             width: `${Math.max((day.savingPkrTotal / maxSaving) * 100, day.savingPkrTotal > 0 ? 2 : 0)}%`,
                           }}
                           aria-hidden="true"
                         />
                         <span
-                          className="mt-1 block h-1 rounded-full bg-green/40"
+                          className="mt-1 block h-1 rounded-full bg-gold/60"
                           style={{
                             width: `${Math.max((day.comparisonsRun / maxCount) * 100, day.comparisonsRun > 0 ? 2 : 0)}%`,
                           }}
@@ -142,6 +165,7 @@ export default async function AdminProofPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </Panel>
 
@@ -184,9 +208,11 @@ export default async function AdminProofPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-panel border border-line bg-white p-4">
-      <div className="font-display text-[20px] font-semibold text-green">{value}</div>
-      <p className="mt-1 text-[13px] text-muted">{label}</p>
+    <div className="rounded-panel-lg bg-surface p-5 shadow-[0_10px_30px_-18px_rgba(0,0,0,.28)]">
+      <p className="text-[13.5px] font-medium text-muted">{label}</p>
+      <div className="mt-2 font-display text-[22px] leading-tight font-semibold tracking-[-0.02em] text-ink tabular-nums">
+        {value}
+      </div>
     </div>
   )
 }

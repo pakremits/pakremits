@@ -203,7 +203,7 @@ export default async function ComparePage({
         <div className="order-last mt-10 flex shrink-0 flex-wrap gap-3 lg:order-none lg:mt-0">
           {/* min-w-0 on the card and sparkline lets the chart shrink on narrow
               phones instead of pushing the page wider than the screen. */}
-          <div className="flex min-w-0 items-center gap-3 rounded-[14px] border border-line bg-surface px-5 py-4 sm:gap-5">
+          <div className="flex min-w-0 items-center gap-3 rounded-[14px] bg-surface px-5 py-4 sm:gap-5">
             <div>
               <div className="text-[13px] text-muted">{tc('midMarket')}</div>
               <div className="mt-0.5 font-display text-[19px] font-semibold whitespace-nowrap tabular-nums">
@@ -238,8 +238,8 @@ export default async function ComparePage({
           <Link
             href={`${localePath(locale, '/')}#alerts`}
             className="flex min-w-[120px] flex-col items-center justify-center gap-1.5 rounded-[14px]
-                       border border-line bg-surface px-5 py-4 text-[15px] font-medium text-ink
-                       no-underline transition-[border-color,box-shadow] hover:border-accent hover:shadow-[0_0_0_2px_var(--color-accent)]"
+                       bg-surface px-5 py-4 text-[15px] font-medium text-ink
+                       no-underline transition-shadow hover:shadow-[0_0_0_2px_var(--color-accent)]"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
               <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" />

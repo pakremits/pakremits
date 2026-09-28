@@ -375,6 +375,112 @@ dialog {
   animation-play-state: paused;
 }
 
+/* Each tile's flag watermark: in its own colours but faint, tilted like a
+   stamp, and faded out towards the text so the rate stays legible. Hover
+   brings it forward. The fade runs towards the tile's end, so it flips for Urdu. */
+.flag-mark {
+  position: absolute;
+  z-index: -1;
+  inset-block: -30%;
+  inset-inline-end: -14px;
+  aspect-ratio: 28 / 20;
+  rotate: -8deg;
+  opacity: 0.45;
+  mask-image: linear-gradient(to right, transparent 0%, #000 45%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 45%);
+  transition:
+    opacity 0.45s ease,
+    rotate 0.45s ease;
+}
+
+.flag-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* On a taller card: a piece in the bottom corner, the empty space beside
+   the rate, so the country name above stays clear. A little fainter than the
+   ticker's, since a card shows more of it. */
+.flag-mark.flag-mark--corner {
+  inset-block: auto -24%;
+  inset-inline-end: -10%;
+  height: 70%;
+  opacity: 0.36;
+}
+
+[data-theme='dark'] .flag-mark.flag-mark--corner {
+  opacity: 0.28;
+}
+
+/* The search bar's pair: the sending country at the start, Pakistan at the
+   end, each fading towards the middle. Fixed height rather than a share of
+   the bar, which is a short row at lg and a tall stacked card below it (where
+   they sit in the top-start and bottom-end corners). Fainter than the cards':
+   labels and values sit right on top of them. */
+.flag-mark.flag-mark--bar {
+  height: 170px;
+  opacity: 0.24;
+}
+
+.flag-mark--bar-start {
+  inset-block: -44px auto;
+  inset-inline: -24px auto;
+  rotate: 8deg;
+  mask-image: linear-gradient(to left, transparent 0%, #000 50%);
+  -webkit-mask-image: linear-gradient(to left, transparent 0%, #000 50%);
+}
+
+.flag-mark--bar-end {
+  inset-block: auto -44px;
+  inset-inline: auto -24px;
+}
+
+[data-theme='dark'] .flag-mark.flag-mark--bar {
+  opacity: 0.2;
+}
+
+[dir='rtl'] .flag-mark.flag-mark--bar-start {
+  rotate: -8deg;
+  mask-image: linear-gradient(to right, transparent 0%, #000 50%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 50%);
+}
+
+[dir='rtl'] .flag-mark {
+  rotate: 8deg;
+  mask-image: linear-gradient(to left, transparent 0%, #000 45%);
+  -webkit-mask-image: linear-gradient(to left, transparent 0%, #000 45%);
+}
+
+/* Dark: the flags' whites would glow, so a touch less. */
+[data-theme='dark'] .flag-mark {
+  opacity: 0.36;
+}
+
+.flag-host:hover .flag-mark,
+.flag-host:focus-visible .flag-mark {
+  opacity: 0.6;
+  rotate: -4deg;
+}
+
+[dir='rtl'] .flag-host:hover .flag-mark,
+[dir='rtl'] .flag-host:focus-visible .flag-mark {
+  rotate: 4deg;
+}
+
+[data-theme='dark'] .flag-host:hover .flag-mark,
+[data-theme='dark'] .flag-host:focus-visible .flag-mark {
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flag-mark {
+    transition: none;
+  }
+}
+
 @keyframes marquee-scroll {
   from {
     transform: translateX(0);
@@ -438,5 +544,44 @@ dialog {
   .skeleton::after {
     animation: none;
     display: none;
+  }
+}
+
+/* The corridor banner's route line: its dots drift towards Pakistan. */
+.route-dash path:first-child {
+  animation: route-dash 1.2s linear infinite;
+}
+
+@keyframes route-dash {
+  to {
+    stroke-dashoffset: -7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-dash path:first-child {
+    animation: none;
+  }
+}
+
+/* The admin drawer: slides in from the end edge. */
+.admin-drawer[open] {
+  animation: admin-drawer-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.admin-drawer[open]::backdrop {
+  animation: sheet-fade 0.32s ease-out;
+}
+
+@keyframes admin-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-drawer[open],
+  .admin-drawer[open]::backdrop {
+    animation: none;
   }
 }

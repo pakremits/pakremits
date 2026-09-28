@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { AdminNav, Panel } from '@/components/admin-chrome'
+import { ADMIN_MAIN, AdminHeader, BUTTON_SECONDARY, FIELD_BASE, Panel, StatusPill } from '@/components/admin-chrome'
 import { providerSettings } from '@/lib/admin/stats'
 import { AffiliateForm } from './affiliate-form'
 import { setFeatured } from './actions'
@@ -14,21 +14,27 @@ export default async function AdminProvidersPage() {
   const rows = await providerSettings()
   const real = rows.filter((row) => !row.isBenchmark)
   const featured = real.find((row) => row.featured)
+  const monetised = real.filter((row) => row.affiliateUrlTemplate).length
 
   return (
     <>
-      <AdminNav current="/admin/providers" />
+      <AdminHeader
+        current="/admin/providers"
+        title="Providers and affiliate links"
+        lede="A provider with no template still gets a working link to its homepage — that is the normal state before a programme is approved, and it must not produce a dead button. The seed never overwrites anything on this page, so these values survive a reseed."
+        status={
+          <>
+            <StatusPill tone={monetised === real.length ? 'ok' : 'warn'}>
+              {monetised} of {real.length} monetised
+            </StatusPill>
+            <StatusPill tone="ok">{featured ? `Sponsored: ${featured.name}` : 'No sponsored row'}</StatusPill>
+          </>
+        }
+      />
 
-      <main className="mx-auto max-w-[1200px] px-6 py-8">
-        <h1 className="font-display text-2xl font-semibold">Providers and affiliate links</h1>
-        <p className="mt-2 max-w-[70ch] text-[14.5px] text-muted">
-          A provider with no template still gets a working link to its homepage — that is the
-          normal state before a programme is approved, and it must not produce a dead button. The
-          seed never overwrites anything on this page, so these values survive a reseed.
-        </p>
-
+      <main className={ADMIN_MAIN}>
         {/* Featured / sponsored */}
-        <div className="mt-7">
+        <div>
           <Panel
             title="Sponsored placement"
             hint="Pins one provider directly below the best deal. Never above it."
@@ -46,7 +52,7 @@ export default async function AdminProvidersPage() {
                   // contradicting itself.
                   key={featured ? String(featured.id) : 'none'}
                   defaultValue={featured ? String(featured.id) : 'none'}
-                  className="h-10 rounded-control border-[1.5px] border-line bg-white px-3 text-[14px]"
+                  className={`${FIELD_BASE} h-11 min-w-[240px] px-3 text-[14px]`}
                 >
                   <option value="none">None — no sponsored row</option>
                   {real.map((row) => (
@@ -58,14 +64,13 @@ export default async function AdminProvidersPage() {
               </label>
               <button
                 type="submit"
-                className="h-10 rounded-control border-[1.5px] border-line px-4 text-[13.5px]
-                           font-medium hover:border-ink hover:bg-ink hover:text-white"
+                className={`${BUTTON_SECONDARY} h-11 px-5 text-[14px]`}
               >
                 Apply
               </button>
             </form>
 
-            <p className="mt-4 border-t border-line-2 pt-3 text-[13px] text-muted">
+            <p className="mt-5 rounded-[12px] bg-mist px-4 py-3 text-[13px] leading-relaxed text-muted">
               One at a time, because the ranking pins the featured row to exactly one position.
               Selecting a provider clears any other rather than leaving the second one&apos;s
               placement arbitrary. The row always carries a visible <b>Sponsored</b> label, and it
@@ -77,28 +82,26 @@ export default async function AdminProvidersPage() {
         </div>
 
         {/* Per-provider affiliate config */}
-        <div className="mt-7 grid gap-5">
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {real.map((provider) => (
-            <div key={provider.id} className="rounded-panel border border-line bg-white p-5">
+            <div key={provider.id} className="rounded-panel-lg bg-surface p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="font-display text-[17px] font-semibold">
                     {provider.name}
                     {provider.featured && (
-                      <span className="ml-2 rounded-full bg-line-2 px-2 py-0.5 text-[11.5px] font-normal text-muted">
+                      <span className="ms-2 rounded-full bg-line-2 px-2 py-0.5 text-[11.5px] font-normal text-muted">
                         Sponsored
                       </span>
                     )}
                   </h2>
-                  <p className="mt-0.5 text-[13px] text-muted">
+                  <p className="mt-0.5 text-[13px] break-all text-muted">
                     <code>{provider.slug}</code> · {provider.homepageUrl || 'no homepage'}
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2.5 py-1 text-[12px] ${
-                    provider.affiliateUrlTemplate
-                      ? 'bg-[#dcf5ec] text-[#037252]'
-                      : 'bg-gold-bg text-gold-dark'
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+                    provider.affiliateUrlTemplate ? 'bg-icon-bg text-ok' : 'bg-gold-bg text-gold-dark'
                   }`}
                 >
                   {provider.affiliateUrlTemplate ? 'monetised' : 'earns nothing'}

@@ -287,13 +287,15 @@ export const en = {
     // these, because an untranslated Latin phrase inside right-to-left text
     // gets reordered by the bidi algorithm into nonsense ("3–5 days" rendered
     // as "days 5–3").
-    speedMinutes: 'Minutes',
+    speedMinutes: 'In minutes',
     speedHours: 'In hours',
     speedSameDay: 'Same day',
     speedFewDays: 'A few days',
     speedVaries: 'Varies',
 
     promoNewCustomer: 'New-customer rate',
+    // Pill for a promo too long to fit one; the full wording goes on its own line.
+    promoOffer: 'Offer',
     to: 'To',
     currency: 'Sending currency',
     receiveCurrency: 'Recipient currency',

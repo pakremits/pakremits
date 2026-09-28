@@ -16,8 +16,8 @@ import type { SendCurrency } from '@/lib/db/schema'
  *
  * By default it does not fetch anything itself: Compare navigates to /compare
  * with the selection in the query string, and that page renders the ranked
- * results on the server. With `onSelectionChange` it is the live ComparePanel's
- * controls instead: every edit is reported and nothing navigates.
+ * results on the server. With `onCompare` it is the live ComparePanel's
+ * controls instead: Compare hands the selection back and nothing navigates.
  */
 
 export interface SearchSelection {
@@ -44,8 +44,12 @@ interface Props {
   className?: string
   /** `row` puts every control on one line (desktop), as on /compare. */
   layout?: 'stacked' | 'row'
-  /** Live mode: called on every change instead of navigating on submit. */
-  onSelectionChange?: (selection: SearchSelection) => void
+  /** Live mode: Compare calls this with the selection instead of navigating. */
+  onCompare?: (selection: SearchSelection) => void
+  /** Live mode: the owner's request is in flight, so Compare shows progress. */
+  busy?: boolean
+  /** Told the moment a different sending country is picked. */
+  onCorridorChange?: (slug: string) => void
   /** Control ids, for pages that link or test against the old panel's ids. */
   ids?: { from: string; method: string; amount: string }
   /** No card of its own (radius, surface, shadow), for use inside a sheet. */
@@ -97,7 +101,9 @@ export function CompareSearch({
   initialAmount,
   className = '',
   layout = 'stacked',
-  onSelectionChange,
+  onCompare,
+  busy = false,
+  onCorridorChange,
   ids = DEFAULT_IDS,
   bare = false,
   onPendingChange,
@@ -112,9 +118,9 @@ export function CompareSearch({
   // Any /compare URL will do for the prefetch: the loading state it caches is
   // the same for every query.
   const [ownPending, ownNavigate] = useArrivalNavigation(
-    shared || onSelectionChange ? null : compareHref(locale, 'uk', 'bank', 500),
+    shared || onCompare ? null : compareHref(locale, 'uk', 'bank', 500),
   )
-  const navigating = shared ? shared.pending : ownPending
+  const navigating = onCompare ? busy : shared ? shared.pending : ownPending
   const navigate = shared ? shared.navigate : ownNavigate
 
   useEffect(() => {
@@ -128,10 +134,6 @@ export function CompareSearch({
 
   const current = corridors.find((c) => c.slug === corridor) ?? first
 
-  function report(next: Partial<SearchSelection>) {
-    onSelectionChange?.({ corridor, payout, amountText, ...next })
-  }
-
   function selectCorridor(next: string) {
     setCorridor(next)
     // Reset the amount to this corridor's standard figure — £500 carried over
@@ -139,25 +141,23 @@ export function CompareSearch({
     const target = corridors.find((c) => c.slug === next)
     const nextAmount = target ? String(target.defaultAmount) : amountText
     setAmountText(nextAmount)
-    report({ corridor: next, amountText: nextAmount })
+    if (next !== corridor) onCorridorChange?.(next)
   }
 
   function selectPayout(next: PayoutOption) {
     setPayout(next)
-    report({ payout: next })
   }
 
   function changeAmount(text: string) {
     setAmountText(text)
-    report({ amountText: text })
   }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault()
-    // Live mode is already up to date; the button is only a focus target.
-    if (onSelectionChange || navigating) return
+    if (navigating) return
     const amount = Number.parseFloat(amountText)
     if (!Number.isFinite(amount) || amount <= 0) return
+    if (onCompare) return onCompare({ corridor, payout, amountText })
     navigate(compareHref(locale, corridor, payout, amount))
   }
 
@@ -271,7 +271,7 @@ export function CompareSearch({
         />
         {/* Wide enough for the switch's arrow in every corridor, so the field
             does not change size when the country does. */}
-        <div className={`${row ? 'w-[96px]' : 'w-[92px] sm:w-[116px]'} shrink-0 border-s-[3px] border-line`}>
+        <div className={`${row ? 'w-[100px]' : 'w-[104px] sm:w-[116px]'} shrink-0 border-s-[3px] border-line`}>
           {currencySymbol ? (
             <IconSelect
               id={`${ids.amount}-currency`}
@@ -355,13 +355,30 @@ export function CompareSearch({
       columns of the bar. One form either way, so the control ids stay unique.
     */
     const sectionHover =
-      'cursor-pointer transition-colors lg:hover:bg-tint lg:[&:hover_button]:text-tint-ink lg:[&:hover_label]:text-tint-ink'
+      'cursor-pointer transition-colors lg:hover:bg-tint/45 lg:[&:hover_button]:text-tint-ink lg:[&:hover_label]:text-tint-ink'
     return (
       <form
         onSubmit={onSubmit}
         className={`${formClass} lg:grid lg:items-end lg:gap-4 lg:px-6 lg:py-4
                     lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_auto_170px]`}
       >
+        {/* The route as a backdrop: the sending country's flag at the start,
+            Pakistan's at the end, in the corridor cards' watermark style. They
+            get their own clipped layer because the form cannot clip: its
+            dropdowns hang below it. Styles in globals.css. */}
+        {!bare && current && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[22px]"
+          >
+            <span className="flag-mark flag-mark--bar flag-mark--bar-start">
+              <CountryFlag countryCode={current.countryCode} />
+            </span>
+            <span className="flag-mark flag-mark--bar flag-mark--bar-end">
+              <CountryFlag countryCode="PK" />
+            </span>
+          </span>
+        )}
         <div className="grid border-b-[3px] border-line sm:grid-cols-2 lg:contents">
           {/* Vertical rules after the first two fields, desktop only. -my-4/py-4
               (and -ms-6/ps-6 on the first) cancel the form's padding so the rules

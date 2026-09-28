@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { type BenchmarkFormState, unpinBenchmark, updateBenchmark } from './actions'
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_BASE } from '@/components/admin-chrome'
 
 interface Row {
   corridorId: number
@@ -15,9 +16,7 @@ interface Row {
   updatedAt: Date
 }
 
-const FIELD =
-  'h-9 w-full rounded-control border-[1.5px] border-line bg-white px-2.5 text-[13.5px] text-ink ' +
-  'focus:border-leaf focus:outline-none focus:ring-4 focus:ring-leaf/15'
+const FIELD = `${FIELD_BASE} h-10 px-2.5 text-[13.5px]`
 
 /**
  * Edit one benchmark row.
@@ -36,13 +35,13 @@ export function BenchmarkForm({ row }: { row: Row }) {
   )
 
   return (
-    <tr className="border-b border-line/60 align-top">
-      <td className="py-2 pr-3 text-ink">
+    <tr className="border-t border-line-2 align-top first:border-0">
+      <td className="py-3 pe-3 font-medium text-ink">
         {row.countryName}
         <span className="block text-[12px] text-muted">{row.deliveryMethod}</span>
       </td>
 
-      <td className="py-2 pr-3" colSpan={4}>
+      <td className="py-3 pe-3" colSpan={4}>
         <form action={formAction} className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="corridorId" value={row.corridorId} />
           <input type="hidden" name="deliveryMethod" value={row.deliveryMethod} />
@@ -85,8 +84,7 @@ export function BenchmarkForm({ row }: { row: Row }) {
           <button
             type="submit"
             disabled={pending}
-            className="h-9 rounded-control bg-green px-3 text-[13px] font-medium text-white
-                       disabled:opacity-60"
+            className={`${BUTTON_PRIMARY} h-10 px-4 text-[13.5px]`}
           >
             {pending ? 'Saving…' : 'Save and pin'}
           </button>
@@ -96,8 +94,7 @@ export function BenchmarkForm({ row }: { row: Row }) {
               type="submit"
               formAction={unpinAction}
               disabled={unpinPending}
-              className="h-9 rounded-control border border-line px-3 text-[13px] text-muted
-                         disabled:opacity-60"
+              className={`${BUTTON_SECONDARY} h-10 px-4 text-[13.5px] disabled:opacity-60`}
             >
               {unpinPending ? 'Unpinning…' : 'Unpin'}
             </button>
@@ -106,7 +103,7 @@ export function BenchmarkForm({ row }: { row: Row }) {
           {(state ?? unpinState) && (
             <p
               className={`w-full text-[12.5px] ${
-                (state ?? unpinState)?.ok ? 'text-leaf' : 'text-red-700'
+                (state ?? unpinState)?.ok ? 'text-ok' : 'text-danger'
               }`}
             >
               {(state ?? unpinState)?.message}
