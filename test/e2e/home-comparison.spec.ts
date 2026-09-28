@@ -31,6 +31,14 @@ async function chooseOption(page: Page, controlId: string, optionName: string) {
   await page.getByRole('option', { name: new RegExp(`^${optionName}\\b`) }).click()
 }
 
+/** The panel only re-fetches on Compare; wait for its skeleton to give way. */
+async function compare(page: Page) {
+  const skeleton = page.locator('#compare section[aria-busy=true]')
+  await page.locator('#compare button[type=submit]').click()
+  await expect(skeleton).toBeVisible()
+  await expect(skeleton).toHaveCount(0, { timeout: 15_000 })
+}
+
 test.beforeEach(async ({ page }) => {
   // The live panel moved off the home page, which now has a search form that
   // hands off to /compare. Corridor pages still carry it in full.
@@ -79,7 +87,7 @@ test('recomputes when the amount changes', async ({ page }) => {
   const before = parsePkr((await first.textContent()) ?? '')
 
   await page.fill('#amt', '1000')
-  // Poll rather than sleep: the panel debounces then fetches.
+  await compare(page)
   await expect
     .poll(async () => parsePkr((await first.textContent()) ?? ''), { timeout: 15_000 })
     .not.toBe(before)
@@ -104,20 +112,24 @@ test('drops providers that do not serve the chosen delivery method', async ({ pa
     (await page.locator(`${results} li`).allTextContents()).join(' ')
 
   await chooseOption(page, 'method', 'Bank account')
+  await compare(page)
   await expect.poll(namesFor, { timeout: 15_000 }).toContain('Wise')
 
   // Wise pays out to Pakistani bank accounts only.
   await chooseOption(page, 'method', 'JazzCash')
+  await compare(page)
   await expect.poll(namesFor, { timeout: 15_000 }).not.toContain('Wise')
 })
 
 test('named bank accounts keep their labels and show bank-deposit quotes', async ({ page }) => {
   await chooseOption(page, 'method', 'Bank account')
+  await compare(page)
   const bankRows = await page.locator(`${results} li b`).allTextContents()
   expect(bankRows.length).toBeGreaterThan(0)
 
   for (const account of ['SadaPay', 'NayaPay', 'Roshan Digital Account']) {
     await chooseOption(page, 'method', account)
+    await compare(page)
     await expect(page.getByText(/general PKR bank-deposit quotes/i)).toBeVisible()
     await expect(page.locator('#method')).toContainText(account === 'Roshan Digital Account' ? 'RDA' : account)
     expect(await page.locator(`${results} li b`).allTextContents()).toEqual(bankRows)

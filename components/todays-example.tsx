@@ -62,10 +62,10 @@ export async function TodaysExample({
   return (
     <section id="example" aria-labelledby="example-title" className="mt-16">
       <div
-        className="grid overflow-hidden rounded-panel-lg border border-line bg-surface
+        className="grid overflow-hidden rounded-panel-lg bg-surface
                    lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
       >
-        <div className="border-b border-line-2 p-7 sm:p-9 lg:border-e lg:border-b-0">
+        <div className="border-b border-line-2 p-7 sm:p-9 lg:border-b-0">
           <h2
             id="example-title"
             className="text-[clamp(26px,3vw,30px)] leading-[1.15] font-semibold"

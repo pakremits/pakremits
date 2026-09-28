@@ -447,6 +447,8 @@ export const ur: Messages = {
     // TODO: native review
     promoNewCustomer: 'نئے صارف کا ریٹ',
     // TODO: native review
+    promoOffer: 'آفر',
+    // TODO: native review
     to: 'وصولی',
     // TODO: native review
     currency: 'بھیجنے کی کرنسی',

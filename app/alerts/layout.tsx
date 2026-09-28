@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { fonts } from '@/lib/fonts'
+import { THEME_SCRIPT } from '@/lib/theme'
 import '../globals.css'
 
 /** Alert links live outside /[locale], so they need their own document shell. */
@@ -10,8 +11,14 @@ export const metadata: Metadata = {
 
 export default function AlertsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-GB" dir="ltr" className={fonts}>
-      <body>{children}</body>
+    // THEME_SCRIPT sets data-theme before hydration, so React must not warn
+    // about the attribute it did not render; same as the locale layout.
+    <html lang="en-GB" dir="ltr" className={fonts} suppressHydrationWarning>
+      <body>
+        {/* First in <body> and blocking, so the saved theme applies before paint. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {children}
+      </body>
     </html>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 
 export interface IconSelectOption {
   value: string
@@ -48,6 +48,20 @@ export function IconSelect({
   const listboxId = useId()
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value))
   const [open, setOpen] = useState(false)
+  const listRef = useRef<HTMLUListElement>(null)
+
+  // Opens upwards (`data-up` on the list) when there is not room below the
+  // trigger but there is above. Measured before paint, so the list never
+  // flashes in the wrong place.
+  useLayoutEffect(() => {
+    const root = rootRef.current?.getBoundingClientRect()
+    const list = listRef.current
+    if (!open || !root || !list) return
+    // Only when it fits above in full: a list cut off at the top of the
+    // window cannot be scrolled into view, one below the fold can.
+    const needed = list.offsetHeight + 16
+    list.toggleAttribute('data-up', window.innerHeight - root.bottom < needed && root.top >= needed)
+  }, [open])
   const [activeIndex, setActiveIndex] = useState(selectedIndex)
   const selected = options[selectedIndex]
 
@@ -129,7 +143,7 @@ export function IconSelect({
         aria-activedescendant={open ? `${listboxId}-${activeIndex}` : undefined}
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={handleKeyDown}
-        className={`${className} flex max-w-full cursor-pointer items-center gap-3 text-left`}
+        className={`${className} flex max-w-full cursor-pointer items-center text-left ${hero ? 'gap-3' : 'gap-1.5'}`}
       >
         {selected?.icon && (
           <span className="flex shrink-0 items-center" aria-hidden="true">
@@ -163,6 +177,7 @@ export function IconSelect({
 
       {open && (
         <ul
+          ref={listRef}
           id={listboxId}
           role="listbox"
           aria-label={label}
@@ -171,12 +186,14 @@ export function IconSelect({
               ? // Phones: centred under the trigger and 32px wider than it, so the
                 // list stays inside the card's padding instead of running off
                 // the right edge the way a left-pinned, content-width list did.
-                `absolute top-full z-40 mt-3 w-max ${listMinWidth} max-w-[min(92vw,460px)] rounded-2xl
+                `absolute z-40 w-max ${listMinWidth} top-full mt-3 data-up:top-auto data-up:bottom-full data-up:mt-0 data-up:mb-3 max-w-[min(92vw,460px)] rounded-2xl
                  max-sm:left-1/2 max-sm:w-[calc(100%+32px)] max-sm:min-w-0 max-sm:max-w-none max-sm:-translate-x-1/2
                  flex flex-col gap-1 bg-surface p-2 shadow-[0_24px_60px_-20px_rgba(20,32,27,.35),0_2px_8px_rgba(20,32,27,.08)]
-                 before:absolute before:-top-1.5 before:left-10 before:h-3 before:w-3
+                 before:absolute before:left-10 before:h-3 before:w-3 before:-top-1.5 data-up:before:top-auto data-up:before:-bottom-1.5
                  before:rotate-45 before:bg-surface before:content-['']`
-              : `absolute z-40 mt-2 max-h-80 w-full overflow-y-auto rounded-xl border
+              : // At least the trigger's width, wider when an option needs it, so a
+                // narrow trigger (the currency switch) never truncates its list.
+                `absolute z-40 max-h-80 w-max min-w-full overflow-y-auto rounded-xl border top-full mt-2 data-up:top-auto data-up:bottom-full data-up:mt-0 data-up:mb-2
                  border-line bg-surface p-1.5`
           }
         >
@@ -187,10 +204,12 @@ export function IconSelect({
               role="option"
               aria-selected={option.value === value}
               onPointerEnter={() => setActiveIndex(index)}
-              onPointerDown={(event) => {
-                event.preventDefault()
-                choose(index)
-              }}
+              // Keep focus on the trigger, but choose on click, not pointerdown:
+              // closing the list mid-tap sent the tap's click through to
+              // whatever lay under it (the Compare button, or the phone
+              // sheet's backdrop), submitting or closing the form.
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() => choose(index)}
               className={
                 hero
                   ? `relative flex cursor-pointer items-center gap-4 rounded-xl px-5 py-3.5

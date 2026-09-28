@@ -65,7 +65,7 @@ export function TitleSkeleton() {
 export function CardsSkeleton() {
   return (
     <div className="order-last mt-10 flex shrink-0 flex-wrap gap-3 lg:order-none lg:mt-0" aria-hidden="true">
-      <div className="flex min-w-0 items-center gap-5 rounded-[14px] border border-line bg-surface px-5 py-4">
+      <div className="flex min-w-0 items-center gap-5 rounded-[14px] bg-surface px-5 py-4">
         <div>
           <Bone className="h-4 w-36" />
           <Bone className="mt-1.5 h-6 w-52" />
@@ -73,7 +73,7 @@ export function CardsSkeleton() {
         </div>
         <Bone className="h-11 w-[110px] shrink" />
       </div>
-      <div className="flex min-w-[120px] flex-col items-center justify-center gap-2 rounded-[14px] border border-line bg-surface px-5 py-4">
+      <div className="flex min-w-[120px] flex-col items-center justify-center gap-2 rounded-[14px] bg-surface px-5 py-4">
         <Bone className="h-6 w-6" />
         <Bone className="h-4 w-20" />
       </div>

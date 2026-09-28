@@ -26,7 +26,7 @@ const DATE_FMT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'shor
 export function RateChart({ points, currency, label, height = 220, bare = false }: RateChartProps) {
   if (points.length < 2) {
     return (
-      <p className="rounded-panel border border-line bg-surface p-6 text-sm text-muted">
+      <p className="rounded-panel bg-surface p-6 text-sm text-muted">
         Not enough history yet to chart {currency} against the rupee. The first full day of
         readings appears here tomorrow.
       </p>
@@ -67,7 +67,7 @@ export function RateChart({ points, currency, label, height = 220, bare = false 
   const rising = changePercent > 0
 
   return (
-    <figure className={bare ? '' : 'rounded-panel border border-line bg-surface p-6'}>
+    <figure className={bare ? '' : 'rounded-panel bg-surface p-6'}>
       <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h3 className="font-display text-lg font-semibold">{label}</h3>

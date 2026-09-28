@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { CompareSearch } from '@/components/compare-search'
 import { CorridorHero } from '@/components/corridor-hero'
+import { HERO_ORIGINS } from '@/lib/hero/origins'
 import { SiteFooter, SiteHeader } from '@/components/site-chrome'
 import { eq } from 'drizzle-orm'
 import { CORRIDORS, CURRENCY_SYMBOLS, defaultAmountFor, formatSend } from '@/lib/corridors'
@@ -45,18 +46,6 @@ export async function generateMetadata({
 // after each refresh, and this is the backstop if that ping is ever missed.
 export const revalidate = 900
 
-
-/** Where each sending corridor starts on the hero map. The Eurozone uses Germany. */
-const HERO_ORIGINS: Record<string, { lon: number; lat: number }> = {
-  uk: { lon: -1.5, lat: 52.5 },
-  uae: { lon: 55.3, lat: 25.2 },
-  'saudi-arabia': { lon: 46.7, lat: 24.7 },
-  qatar: { lon: 51.5, lat: 25.3 },
-  usa: { lon: -95, lat: 38 },
-  canada: { lon: -79.4, lat: 43.7 },
-  eurozone: { lon: 10, lat: 51 },
-  australia: { lon: 151.2, lat: -33.9 },
-}
 
 /**
  * The hero form opens on $1,000 from the USA, and the worked example, payout
@@ -271,7 +260,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             ].map((card) => (
               <li
                 key={card.title}
-                className="flex min-h-60 flex-col rounded-[10px] border border-line bg-surface p-6"
+                className="flex min-h-60 flex-col rounded-[10px] bg-surface p-6"
               >
                 <div className="grid h-10 w-10 place-items-center rounded-[11px] bg-icon-bg text-leaf">
                   <svg
@@ -341,7 +330,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 path: 'M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z',
               },
             ].map((card) => (
-              <div key={card.title} className="rounded-panel border border-line bg-surface p-7">
+              <div key={card.title} className="rounded-panel bg-surface p-7">
                 <div className="mb-4.5 grid h-11 w-11 place-items-center rounded-[12px] bg-icon-bg text-leaf">
                   <svg
                     viewBox="0 0 24 24"
@@ -364,12 +353,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         {/* Every service in the comparison. */}
         <ProviderRoster locale={locale} providers={rosterProviders} />
 
-        {/* Corridors. Full-bleed like the marquee, so the dark theme's band
-            runs edge to edge; in light the band is transparent and the section
-            looks as it always did. */}
+        {/* Corridors. Full-bleed like the marquee: a mint band in the light
+            theme, the usual dark band in the dark one. */}
         <section
           id="corridors"
-          className="ms-[calc(50%-50vw)] mt-24 w-screen bg-band dark:mt-16 dark:py-16"
+          className="ms-[calc(50%-50vw)] mt-16 w-screen bg-[#d9eddf82] py-16 dark:bg-band"
         >
           <div className="mx-auto max-w-[1120px] px-6">
             <div className="max-w-[44ch]">
@@ -386,10 +374,19 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 <Link
                   key={chip.slug}
                   href={corridorPath(chip.slug, locale)}
-                  className="flex flex-col gap-3.5 rounded-[14px] border border-line bg-surface p-4.5
-                             no-underline transition-[border-color,box-shadow] hover:border-accent
-                             hover:shadow-[0_0_0_2px_var(--color-accent)]"
+                  // isolate: the watermark's z-index stays inside the card.
+                  className="flag-host group/cc relative isolate flex min-h-[148px] flex-col overflow-hidden rounded-[14px]
+                             bg-surface p-5 text-ink no-underline focus-visible:outline-none dark:bg-header
+                             focus-visible:ring-[3px] focus-visible:ring-accent"
                 >
+                  {/* The same flag watermark as the rate ticker, cropped into the
+                      top corner and faded towards the name. */}
+                  <span className="flag-mark flag-mark--corner" aria-hidden="true">
+                    <CountryFlag
+                      countryCode={COUNTRY_BY_CURRENCY.get(chip.currency as SendCurrency) ?? 'EU'}
+                    />
+                  </span>
+
                   <span className="flex items-center gap-3 text-[15px] font-medium">
                     <span className="grid h-8 w-9 place-items-center" aria-hidden="true">
                       <CountryFlag
@@ -398,11 +395,33 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                     </span>
                     {chip.countryName}
                   </span>
-                  <span className="flex items-baseline justify-between border-t border-line-2 pt-3 text-[12.5px] text-muted">
-                    {t('bestToday')}
-                    <b className="font-display text-lg font-semibold tabular-nums text-ink">
-                      {chip.bestRate?.toFixed(2) ?? '—'}
-                    </b>
+
+                  {/* The rate is the reason to click, so it leads. */}
+                  <span className="mt-auto flex items-end justify-between gap-3 pt-6">
+                    <span>
+                      <b className="block font-display text-[30px] leading-none font-semibold tracking-[-0.02em] tabular-nums">
+                        {chip.bestRate?.toFixed(2) ?? '—'}
+                      </b>
+                      <span className="mt-2 block text-[12.5px] text-muted">
+                        {t('bestToday')}
+                        <span className="ms-1.5 text-faint" dir="ltr">
+                          {chip.currency} → PKR
+                        </span>
+                      </span>
+                    </span>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      className="mb-1 h-5 w-5 shrink-0 -translate-x-1 text-tint-ink opacity-0 transition-[opacity,translate]
+                                 group-hover/cc:translate-x-0 group-hover/cc:opacity-100
+                                 group-focus-visible/cc:translate-x-0 group-focus-visible/cc:opacity-100
+                                 rtl:rotate-180 rtl:translate-x-1 motion-reduce:transition-none"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
                   </span>
                 </Link>
               ))}
