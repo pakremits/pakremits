@@ -125,7 +125,7 @@ npm run dev
 | --- | --- |
 | `npm run dev` | Dev server |
 | `npm test` | Unit tests (compute, ranking, adapter parsers) |
-| `npm run typecheck` | `tsc --noEmit` |
+| `npm run typecheck` | `next typegen && tsc --noEmit`: route types first, as on a fresh checkout |
 | `npm run probe` | Call every adapter live and print a comparison table |
 | `npm run probe -- --from AED --amount 3000 --method wallet` | Probe one corridor |
 | `npm run probe -- --save` | Re-capture test fixtures from live responses |
@@ -154,56 +154,102 @@ so Urdu pages link to Urdu pages. Adding a page means adding a rewrite line.
 
 ## Deploying to Fly.io
 
-This repository is prepared for Fly Launch's Next.js detector. `package.json`
-identifies the framework and `next.config.ts` enables Next's standalone output,
-so Fly can generate an optimized multi-stage `Dockerfile` and `fly.toml` for the
-project. Those two files are intentionally generated at launch time because the
-Fly app name, organization, and region are chosen during that flow.
+The `Dockerfile` and both Fly configs are committed. `fly.staging.toml` is the
+staging app, `pakremits-staging` at https://stage.pakremits.com; `fly.toml`
+describes a production app, `pakremits`, that has not been created on Fly yet.
+The image compiles with `next build --experimental-build-mode compile`, which
+needs no database, and `docker-entrypoint.mjs` prerenders the pages when the
+container boots, once Fly has injected `DATABASE_URL`.
 
-Install `flyctl`, sign in, and run these commands from the repository root:
-
-```bash
-fly auth login
-fly launch --no-deploy
-```
-
-Review the generated files before the first deploy. The generated service should
-listen on internal port `3000`; configure its HTTP health check to use
-`/api/health`. Keep one Machine initially because Next's in-memory/filesystem
-cache invalidation is local to each Machine.
-
-Set server-only values on the Fly app. `DIRECT_URL` is only needed on the machine
-where you run migrations, so it does not need to be a web-app secret.
+Server-only values are Fly secrets: `DATABASE_URL`, `CRON_SECRET` and
+`ADMIN_PASSWORD`, plus whichever notification secrets from `.env.example` you use.
 
 ```bash
-fly secrets set DATABASE_URL="postgresql://..." CRON_SECRET="..." ADMIN_PASSWORD="..."
+fly secrets set -a pakremits-staging DATABASE_URL="postgresql://..." CRON_SECRET="..." ADMIN_PASSWORD="..."
 ```
 
-Add whichever notification secrets from `.env.example` you use. Then migrate
-from a trusted machine that has `DIRECT_URL`, and deploy:
+`NEXT_PUBLIC_*` values are compiled into the browser bundle, so they go in the
+config's `[build.args]` as well as `[env]`, never in secrets. Do not commit
+secrets to either TOML file.
+
+The HTTP health check deliberately uses `/`, not `/api/health`: the server only
+starts listening once the boot-time prerender has finished, so a passing `/`
+means the release can serve pages. Keep one Machine, because Next's filesystem
+cache and tag invalidation are local to each Machine.
+
+After the first deploy of a new app, set the GitHub Actions repository variable
+`SITE_URL` to its public address. The scheduled refresh updates PostgreSQL
+directly and then asks that address to revalidate its cached quote pages.
+
+### Continuous deployment
+
+`.github/workflows/ci.yml` runs on every pull request into `main` and every push
+to `main`:
+
+| Job | Runs on | What it does |
+| --- | --- | --- |
+| `verify` | PRs and pushes | Typecheck, lint, unit tests, and the same compile-mode build the image runs |
+| `migrations` | PRs and pushes | Applies every migration to an empty Postgres, then checks a second run applies nothing |
+| `deploy-staging` | Pushes to `main` that pass both | Deploys `pakremits-staging`, smoke-tests it, and rolls back if that fails |
+
+These are the only type and lint gates before a deploy: the compile-mode build
+skips type checking, and Next 16's build no longer runs ESLint.
+
+The deploy job:
+
+1. **Deploys only the tip of `main`.** Deploys queue one at a time, and a run
+   whose commit is no longer the tip skips, so a slow or re-run job never
+   downgrades staging.
+2. **Migrates first.** Fly runs `node scripts/migrate.mjs` as the release
+   command, in a one-off Machine with the app's own secrets, before any Machine
+   is replaced. Pending migrations apply in one transaction; a failure stops the
+   deploy with the old release still serving.
+3. **Switches blue-green.** The new Machine boots beside the old one and only
+   takes traffic once its health check passes, so the boot-time prerender is not
+   downtime, and a release that fails to boot never serves.
+4. **Smoke-tests the result.** It waits for `/api/health` to report the new
+   commit (the image carries it as `GIT_SHA`), checks the main pages return 200,
+   and checks staging still refuses indexing. It sends GET requests only and
+   never touches `/go/*` or `/api/quotes`, which record the clicks and
+   comparisons behind the public proof figures.
+5. **Rolls back** to the image that was serving if the smoke test fails. The job
+   still fails, so someone looks.
+
+**Migrations must keep working with the release that is still serving**,
+because they run before the switch and a rollback does not reverse them. Add
+columns and tables before code uses them; remove them in a later release. Do not
+run `npm run db:migrate` by hand during a deploy: the migrator takes no lock.
+
+#### One-time setup
+
+The deploy uses an app-scoped Fly token that only `main` can read:
+
+1. Create it with
+   `fly tokens create deploy -a pakremits-staging -n "GitHub Actions staging deploy" -x 8760h`
+   and copy the whole output, including the `FlyV1 ` prefix.
+2. On GitHub, as the repository owner: **Settings → Environments → New
+   environment** `staging`. Under deployment branches choose *Selected branches*
+   and add `main`, then add the environment secret `FLY_DEPLOY_TOKEN`. The
+   repository secret `FLY_API_TOKEN` is the refresh workflow's database tunnel
+   and cannot deploy; leave it alone.
+3. Recommended: a branch ruleset on `main` requiring a pull request and the
+   `verify` and `migrations` checks, with force pushes blocked. Never add path
+   filters to `ci.yml`: a required check that never runs blocks the PR.
+
+The token expires after a year. Replace the secret, then remove the old token
+with `fly tokens list -a pakremits-staging` and `fly tokens revoke <id>`.
+
+#### Deploying or rolling back by hand
 
 ```bash
-npm run db:migrate
-fly deploy --build-arg NEXT_PUBLIC_SITE_URL="https://YOUR-APP.fly.dev"
+fly deploy -c fly.staging.toml --build-arg GIT_SHA=$(git rev-parse HEAD)
+fly releases -a pakremits-staging --image
+fly deploy -c fly.staging.toml --image <image ref> --skip-release-command
 ```
 
-`NEXT_PUBLIC_*` variables are compiled into the browser bundle. If Plausible is
-enabled, declare both public names under the generated `fly.toml` `[build.args]`
-table and pass both values to `fly deploy`:
-
-```toml
-[build.args]
-  NEXT_PUBLIC_SITE_URL = ""
-  NEXT_PUBLIC_PLAUSIBLE_DOMAIN = ""
-```
-
-Do not commit production secrets to `fly.toml`. After the first deploy, set the
-GitHub Actions repository variable `SITE_URL` to the new `https://...fly.dev`
-address. The scheduled refresh will continue to update PostgreSQL directly and
-will ask the Fly app to revalidate its cached quote pages.
-
-Fly's official [Next.js guide](https://fly.io/nextjs/) documents the detector,
-generated files, standalone output, and the build-time/runtime environment split.
+Pass `--skip-release-command` when redeploying an older image: its migrations
+are already applied, and images built before the pipeline have no
+`scripts/migrate.mjs`.
 
 ### Staging and production URLs, sitemap, and crawling
 
