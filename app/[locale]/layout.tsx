@@ -10,6 +10,7 @@ import { getMessages } from '@/i18n/messages'
 import { NavigationScrollReset } from '@/components/navigation-scroll-reset'
 import { RateAlertDialog } from '@/components/rate-alert-dialog'
 import { THEME_SCRIPT } from '@/lib/theme'
+import { InlineScript } from '@/components/inline-script'
 import { CORRIDORS } from '@/lib/corridors'
 import { latestMidMarket } from '@/lib/quotes'
 import '../globals.css'
@@ -112,7 +113,7 @@ export default async function LocaleLayout({
       <body>
         {/* First in <body> and blocking on purpose: it must set the theme
             before anything paints. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <InlineScript html={THEME_SCRIPT} />
         {gtmId && (
           <noscript>
             <iframe

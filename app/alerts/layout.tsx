@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { fonts } from '@/lib/fonts'
 import { THEME_SCRIPT } from '@/lib/theme'
+import { InlineScript } from '@/components/inline-script'
 import '../globals.css'
 
 /** Alert links live outside /[locale], so they need their own document shell. */
@@ -16,7 +17,7 @@ export default function AlertsLayout({ children }: { children: React.ReactNode }
     <html lang="en-GB" dir="ltr" className={fonts} suppressHydrationWarning>
       <body>
         {/* First in <body> and blocking, so the saved theme applies before paint. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <InlineScript html={THEME_SCRIPT} />
         {children}
       </body>
     </html>

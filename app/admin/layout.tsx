@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { fonts } from '@/lib/fonts'
 import { THEME_SCRIPT } from '@/lib/theme'
+import { InlineScript } from '@/components/inline-script'
 import { AdminSidebar } from '@/components/admin-sidebar'
 import '../globals.css'
 
@@ -19,7 +20,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // THEME_SCRIPT sets data-theme before hydration, as in the locale layout.
     <html lang="en-GB" dir="ltr" className={fonts} suppressHydrationWarning>
       <body>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <InlineScript html={THEME_SCRIPT} />
         <AdminSidebar />
         <div className="lg:ps-[288px]">{children}</div>
       </body>
