@@ -6,6 +6,10 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => (
 /**
  * The site's palette, spelled out: email clients get no CSS variables. Gold is
  * the one primary action, as on the site's Compare button; green is the brand.
+ * The header band is the site's hero gradient (.hero-gradient in
+ * app/globals.css) up to its 60% stop. The site's band runs on to #0ab688, but
+ * white text there falls below 3:1, and an email headline can run the full
+ * width; #14936f keeps every headline at 3.86:1 or better.
  */
 const C = {
   canvas: '#f3f6f4',
@@ -17,8 +21,10 @@ const C = {
   body: '#42564c',
   muted: '#5c6b63',
   brand: '#037252',
+  brandMid: '#14936f',
   tint: '#e3f6ef',
   gold: '#e0a513',
+  white: '#ffffff',
 }
 
 const FONT = "Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
@@ -65,12 +71,14 @@ ${input.facts
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(input.preview)}</div>
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" bgcolor="${C.canvas}" style="width:100%;background:${C.canvas}"><tr><td align="center" style="padding:32px 14px">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" bgcolor="${C.surface}" style="width:100%;max-width:560px;background:${C.surface};border-radius:18px;overflow:hidden">
-<tr><td style="padding:26px 32px 0">
+<tr><td style="padding:22px 32px">
 <a href="${home}" style="display:inline-block;text-decoration:none"><img src="${home}/pakrimits-email-logo.png" width="160" height="32" alt="PakRemits" style="display:block;width:160px;height:32px;border:0;outline:none;text-decoration:none"></a>
 </td></tr>
-<tr><td style="padding:30px 32px 32px">
+<tr><td bgcolor="${C.brand}" style="padding:28px 32px 30px;background-color:${C.brand};background-image:linear-gradient(61deg,${C.brand} 0%,${C.brandMid} 100%)">
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 14px"><tr><td bgcolor="${C.tint}" style="background:${C.tint};border-radius:999px;padding:5px 12px;color:${C.brand};font-size:13px;line-height:18px;font-weight:700">${escapeHtml(input.label)}</td></tr></table>
-<h1 style="margin:0 0 12px;color:${C.ink};font-size:27px;line-height:34px;font-weight:700;letter-spacing:-0.5px">${escapeHtml(input.title)}</h1>
+<h1 style="margin:0;color:${C.white};font-size:27px;line-height:34px;font-weight:700;letter-spacing:-0.5px">${escapeHtml(input.title)}</h1>
+</td></tr>
+<tr><td style="padding:28px 32px 32px">
 <p style="margin:0 0 28px;color:${C.body};font-size:16px;line-height:26px">${escapeHtml(input.body)}</p>
 ${facts}
 <table role="presentation" cellpadding="0" cellspacing="0"><tr><td bgcolor="${C.gold}" style="background:${C.gold};border-radius:10px">
