@@ -31,6 +31,11 @@ test('the comparison panel is fully operable by keyboard', async ({ page }) => {
   await page.keyboard.press('Enter')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Enter')
+  // On a corridor page, picking another country opens that country's page.
+  // Wait for it, or the Tabs below can land while it is still loading and
+  // lose focus to the new document.
+  await page.waitForURL('**/compare/uae-to-pakistan')
+  await page.waitForLoadState('load')
   // The one-row bar shows the short name once selected.
   await expect(page.locator('#from')).toContainText(/UAE|United Arab Emirates/)
   await expect
@@ -107,16 +112,24 @@ test('every page has one h1 and a labelled main landmark', async ({ page }) => {
   }
 })
 
-test('the Urdu page declares its language and direction', async ({ page }) => {
-  await page.goto('/ur')
-  const html = page.locator('html')
-  await expect(html).toHaveAttribute('dir', 'rtl')
-  await expect(html).toHaveAttribute('lang', 'ur-PK')
+// Urdu is switched off for now (ENABLED_LOCALES in i18n/routing.ts). When it
+// comes back, restore the lang/dir check for /ur from git history.
+test('Urdu URLs land on the same page in English while Urdu is off', async ({ page }) => {
+  for (const [from, to] of [
+    ['/ur', '/'],
+    ['/ur/compare/uk-to-pakistan', '/compare/uk-to-pakistan'],
+  ]) {
+    await page.goto(from)
+    expect(new URL(page.url()).pathname, `${from} should land on ${to}`).toBe(to)
+    const html = page.locator('html')
+    await expect(html).toHaveAttribute('lang', 'en-GB')
+    await expect(html).toHaveAttribute('dir', 'ltr')
+  }
 })
 
 test('no page scrolls horizontally on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 })
-  for (const path of ['/', '/ur', '/compare/uk-to-pakistan', '/gbp-to-pkr']) {
+  for (const path of ['/', '/compare/uk-to-pakistan', '/gbp-to-pkr', '/compare/jazzcash-transfers']) {
     await page.goto(path)
     const overflow = await page.evaluate(() => {
       const de = document.documentElement

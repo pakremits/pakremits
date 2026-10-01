@@ -14,13 +14,24 @@ import { generateAlertToken } from '@/lib/alerts/tokens'
 import { composeConfirmMessage } from '@/lib/alerts/messages'
 import { send } from '@/lib/notify'
 import { verifyTurnstile } from '@/lib/alerts/turnstile'
+import { allow, clientIp } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
-/** Cap on live alerts per contact, so one address cannot be used as a queue. */
+/** Cap on confirmed alerts per contact, so one address cannot be used as a queue. */
 const MAX_ALERTS_PER_CONTACT = 10
 
+/** Sign-ups per IP per hour: plenty for a person, a brake on mail-bombing. */
+const SIGNUPS_PER_HOUR = 5
+
 export async function POST(request: Request) {
+  if (!allow(`alerts:${clientIp(request)}`, SIGNUPS_PER_HOUR, 60 * 60 * 1000)) {
+    return NextResponse.json(
+      { error: 'Too many alerts set up from here in the last hour. Try again later.' },
+      { status: 429 },
+    )
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -53,7 +64,13 @@ export async function POST(request: Request) {
 
   try {
     const existing = await db
-      .select({ id: rateAlerts.id, currency: rateAlerts.fromCurrency, target: rateAlerts.targetRate, direction: rateAlerts.direction })
+      .select({
+        id: rateAlerts.id,
+        currency: rateAlerts.fromCurrency,
+        target: rateAlerts.targetRate,
+        direction: rateAlerts.direction,
+        confirmed: rateAlerts.confirmed,
+      })
       .from(rateAlerts)
       .where(and(eq(rateAlerts.userContact, contact), eq(rateAlerts.active, true)))
 
@@ -69,7 +86,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, alreadyExists: true })
     }
 
-    if (existing.length >= MAX_ALERTS_PER_CONTACT) {
+    // One unconfirmed alert at a time per address. Otherwise anyone could send
+    // a stranger a stack of confirmation emails, and the unconfirmed rows would
+    // fill the cap and lock the real owner out for 48 hours.
+    if (existing.some((row) => !row.confirmed)) {
+      return NextResponse.json(
+        {
+          error:
+            'We already sent a confirmation link to this address. Use it (check spam too), then add more alerts.',
+        },
+        { status: 429 },
+      )
+    }
+
+    // Only confirmed alerts count towards the cap.
+    if (existing.filter((row) => row.confirmed).length >= MAX_ALERTS_PER_CONTACT) {
       return NextResponse.json(
         {
           error: `That is already ${MAX_ALERTS_PER_CONTACT} live alerts. Remove one first.`,

@@ -5,10 +5,22 @@ import { searchIndexingEnabled } from '@/lib/seo'
 afterEach(() => vi.unstubAllEnvs())
 
 describe('site crawler policy', () => {
-  it('blocks every crawler when indexing has not been enabled', () => {
+  it('lets crawlers in to see the noindex, but submits no sitemap, when indexing is off', () => {
+    // Staging is kept out of search by noindex (X-Robots-Tag and the robots
+    // meta tag). A `Disallow: /` would stop crawlers from ever reading it.
     vi.stubEnv('ROBOTS_ALLOW_INDEXING', 'false')
     expect(searchIndexingEnabled()).toBe(false)
-    expect(robots()).toEqual({ rules: { userAgent: '*', disallow: '/' } })
+    const policy = robots()
+    expect(policy.rules).toMatchObject([{ userAgent: '*', allow: '/' }])
+    expect(policy.sitemap).toBeUndefined()
+  })
+
+  it('always keeps private and tracking routes out', () => {
+    for (const value of ['false', 'true']) {
+      vi.stubEnv('ROBOTS_ALLOW_INDEXING', value)
+      const [rule] = robots().rules as { disallow: string[] }[]
+      expect(rule.disallow).toEqual(expect.arrayContaining(['/admin', '/api/', '/go/', '/alerts/']))
+    }
   })
 
   it('advertises the sitemap only after the production switch', () => {

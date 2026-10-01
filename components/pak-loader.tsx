@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type CSSProperties } from 'react'
-import { SPLASH_SEEN_KEY } from '@/lib/splash'
+import { SPLASH_CAP_MS, SPLASH_SEEN_KEY } from '@/lib/splash'
 import styles from './pak-loader.module.css'
 
 /**
@@ -9,14 +9,16 @@ import styles from './pak-loader.module.css'
  *
  * Server-rendered, so it covers the page from the first paint, then fades out
  * once the build-up has played and the window has loaded (at most MAX_MS).
- * Once per tab session: SPLASH_SCRIPT marks <html> before paint on a repeat
- * load, and the CSS hides the overlay. Client navigations keep the layout
+ * Only on a direct visit, once per tab session: SPLASH_SCRIPT marks <html>
+ * before paint on a repeat load, an arrival from another site (a search
+ * result) or a crawler, and the CSS hides the overlay. The same script also
+ * enforces the cap from first paint, so slow hydration cannot extend it. Client navigations keep the layout
  * mounted, so they never replay it.
  */
 
 const MIN_MS = 2200 // let the build-up finish before leaving
 const REDUCED_MIN_MS = 600 // no build-up to wait for, just the logo
-const MAX_MS = 5000 // never block the page longer than this
+const MAX_MS = SPLASH_CAP_MS // never block the page longer than this
 const EXIT_MS = 450 // must match the .exit transition in the CSS
 
 // Paths traced from the pakrimits logo (viewBox 0 0 480 96).

@@ -1,5 +1,6 @@
 'use server'
 
+import { assertAdmin } from '@/lib/admin/assert-admin'
 import { eq, ne } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -26,6 +27,7 @@ export async function saveAffiliateSettings(
   _previous: SettingsState,
   formData: FormData,
 ): Promise<SettingsState> {
+  await assertAdmin()
   const parsed = TemplateSchema.safeParse(Object.fromEntries(formData))
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Check the values.' }
@@ -69,6 +71,7 @@ export async function saveAffiliateSettings(
  * the rest rather than leaving that ambiguity in the data.
  */
 export async function setFeatured(formData: FormData): Promise<void> {
+  await assertAdmin()
   const raw = String(formData.get('providerId') ?? '')
   const providerId = raw === 'none' ? null : Number.parseInt(raw, 10)
 

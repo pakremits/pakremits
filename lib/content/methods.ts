@@ -18,6 +18,8 @@ export interface MethodContent {
   /** Which stored delivery method the comparison table should be set to. */
   method: DeliveryMethod
   title: string
+  /** Search title, when the page title alone says too little. Defaults to `title`. */
+  metaTitle?: string
   metaDescription: string
   intro: string[]
   sections: { heading: string; body: string[] }[]
@@ -159,6 +161,7 @@ export const METHOD_CONTENT: MethodContent[] = [
     slug: 'rda',
     method: 'rda',
     title: 'Roshan Digital Account transfers',
+    metaTitle: 'Roshan Digital Account transfers: compare rates',
     metaDescription:
       'What a Roshan Digital Account is, who can open one, and when it is the right way to move ' +
       'money to Pakistan rather than an ordinary transfer.',

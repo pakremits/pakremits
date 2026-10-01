@@ -339,6 +339,7 @@ export const en = {
       'received. We are not a money transfer service and never hold your funds.',
     compare: 'Compare',
     rates: 'Rates',
+    receive: 'Ways to receive',
     brand: 'PakRemits',
     copyright: '© {year} PakRemits. Rates are indicative and provided for comparison only.',
   },

@@ -26,6 +26,8 @@ import {
   formatSend,
 } from '@/lib/corridors'
 import { CORRIDOR_CONTENT } from '@/lib/content/corridors'
+import { METHOD_CONTENT } from '@/lib/content/methods'
+import { methodPath } from '@/lib/routes'
 import { formatPkr } from '@/lib/ranking/compute'
 import { getComparison, getMidMarketSeries } from '@/lib/quotes'
 import { publicPageMetadata, jsonLd } from '@/lib/seo'
@@ -60,7 +62,9 @@ export async function generateMetadata({
   const path = corridorPath(slug)
 
   return publicPageMetadata({
-    title: `Send money from ${corridor.articleName} to Pakistan: compare rates | PakRemits`,
+    // Kept within ~60 characters so search results show it whole; the
+    // description and the /compare URL already say it is a comparison.
+    title: `Send money from ${corridor.articleName} to Pakistan | PakRemits`,
     description: content.metaDescription,
     path,
     alternates: alternatesFor(path),
@@ -141,7 +145,8 @@ export default async function CorridorPage({ params }: { params: Promise<{ local
               alt=""
               width={762}
               height={1661}
-              priority
+              // Not preloaded: it is hidden below lg, and a lazy image that is
+              // not displayed is never fetched, so phones skip it entirely.
               sizes="230px"
               data-hero-mascot=""
               className="pointer-events-none absolute end-6 -bottom-[54px] hidden h-[480px] w-auto drop-shadow-[0_12px_24px_rgba(0,0,0,.25)] transition-[translate] duration-500 select-none motion-reduce:transition-none lg:block"
@@ -306,6 +311,17 @@ export default async function CorridorPage({ params }: { params: Promise<{ local
                       className="text-ink no-underline hover:text-leaf"
                     >
                       {other.fromCountryName} to Pakistan
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              <h2 className="mt-8 text-[13px] font-medium text-faint">Ways to receive</h2>
+              <ul className="mt-3.5 grid gap-2 text-[15px]">
+                {METHOD_CONTENT.map((entry) => (
+                  <li key={entry.slug}>
+                    <Link href={methodPath(entry.slug)} className="text-ink no-underline hover:text-leaf">
+                      {entry.title}
                     </Link>
                   </li>
                 ))}

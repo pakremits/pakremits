@@ -29,6 +29,40 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
  * Adding a page therefore means adding a line here. That is the cost of clean
  * URLs plus an unprefixed default locale, and it is worth it.
  */
+/**
+ * Content-Security-Policy, in two parts.
+ *
+ * Enforced: the directives that cannot break a page. No plugins, no <base>
+ * hijack, no framing (as X-Frame-Options), forms post only to this site.
+ *
+ * Report-only: the full allow-list for scripts, styles, connections and
+ * frames (Google Tag Manager and Analytics, Cloudflare Turnstile). Browsers
+ * log what it would block without blocking it. Check the console against the
+ * live GTM container, which can load tags this list does not know about, then
+ * move it into the enforced header. Inline scripts stay allowed: hashing or
+ * nonces would make every page render dynamically.
+ */
+const CSP_ENFORCED = [
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+].join('; ')
+
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"} https://www.googletagmanager.com https://challenges.cloudflare.com`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://challenges.cloudflare.com",
+  'frame-src https://challenges.cloudflare.com https://www.googletagmanager.com',
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+].join('; ')
+
 const nextConfig: NextConfig = {
   // Fly Launch detects this and generates a smaller production image that
   // starts the self-contained `.next/standalone/server.js` output.
@@ -71,8 +105,18 @@ const nextConfig: NextConfig = {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains',
           },
+          { key: 'Content-Security-Policy', value: CSP_ENFORCED },
+          { key: 'Content-Security-Policy-Report-Only', value: CSP_REPORT_ONLY },
         ],
       },
+      /**
+       * Staging and previews: noindex on every response, HTML or not. Read at
+       * build time, which is when the Dockerfile sets ROBOTS_ALLOW_INDEXING.
+       * robots.txt deliberately still allows crawling, so this is seen.
+       */
+      ...(process.env.ROBOTS_ALLOW_INDEXING === 'true'
+        ? []
+        : [{ source: '/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] }]),
       /**
        * Alert pages carry a capability token in the path (/alerts/manage/<token>).
        * The site-wide policy sends the full URL as the referrer on same-origin
@@ -108,22 +152,38 @@ const nextConfig: NextConfig = {
        * Safe against the rewrites: redirects run before `beforeFiles`, and the
        * internal result of a rewrite is not fed back through them.
        */
+      /**
+       * Production answers on both pakremits.com and its Fly hostname. Only the
+       * public domain is canonical, so the Fly hostname redirects to it rather
+       * than serving a duplicate copy of the site. Matches that host exactly:
+       * Fly's health checks reach the Machine by its private address.
+       */
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'pakremits.fly.dev' }],
+        destination: 'https://pakremits.com/:path*',
+        permanent: true,
+      },
       { source: '/en', destination: '/', permanent: true },
       { source: '/en/:path*', destination: '/:path*', permanent: true },
 
       /**
+       * Urdu is switched off for now (ENABLED_LOCALES in i18n/routing.ts).
+       * Every /ur URL goes to the same page in English. Temporary (307), not
+       * permanent: Urdu is coming back, and a cached permanent redirect would
+       * keep readers away from it after it does.
+       */
+      { source: '/ur', destination: '/', permanent: false },
+      { source: '/ur/:path*', destination: '/:path*', permanent: false },
+
+      /**
        * The comparison pages moved from /send-money-… to /compare/… (PakRemits
        * compares services; it does not send money). Permanent, so search
-       * engines move each page's ranking to its new address. Urdu first: the
-       * English patterns would not match a /ur/ path anyway, but keeping each
-       * locale's group together reads better.
+       * engines move each page's ranking to its new address.
        */
       { source: '/send-money-from-:slug-to-pakistan', destination: '/compare/:slug-to-pakistan', permanent: true },
       { source: '/roshan-digital-account-transfer', destination: '/compare/roshan-digital-account-transfers', permanent: true },
       { source: '/send-money-to-:slug', destination: '/compare/:slug-transfers', permanent: true },
-      { source: '/ur/send-money-from-:slug-to-pakistan', destination: '/ur/compare/:slug-to-pakistan', permanent: true },
-      { source: '/ur/roshan-digital-account-transfer', destination: '/ur/compare/roshan-digital-account-transfers', permanent: true },
-      { source: '/ur/send-money-to-:slug', destination: '/ur/compare/:slug-transfers', permanent: true },
 
       // Old/internal router paths occasionally escape through copied URLs.
       // Send valid-looking ones to their public equivalents instead of 404ing
@@ -132,10 +192,6 @@ const nextConfig: NextConfig = {
       { source: '/rate/:currency', destination: '/:currency-to-pkr', permanent: true },
       { source: '/method/rda', destination: '/compare/roshan-digital-account-transfers', permanent: true },
       { source: '/method/:slug', destination: '/compare/:slug-transfers', permanent: true },
-      { source: '/ur/corridor/:slug', destination: '/ur/compare/:slug-to-pakistan', permanent: true },
-      { source: '/ur/rate/:currency', destination: '/ur/:currency-to-pkr', permanent: true },
-      { source: '/ur/method/rda', destination: '/ur/compare/roshan-digital-account-transfers', permanent: true },
-      { source: '/ur/method/:slug', destination: '/ur/compare/:slug-transfers', permanent: true },
     ]
   },
 
@@ -162,11 +218,10 @@ const nextConfig: NextConfig = {
         { source: '/compare/:slug-transfers', destination: '/en/method/:slug' },
         { source: '/:currency-to-pkr', destination: '/en/rate/:currency' },
 
-        // ─── Pretty URLs, Urdu ───────────────────────────────────────────
-        { source: '/ur/compare/:slug-to-pakistan', destination: '/ur/corridor/:slug' },
-        { source: '/ur/compare/roshan-digital-account-transfers', destination: '/ur/method/rda' },
-        { source: '/ur/compare/:slug-transfers', destination: '/ur/method/:slug' },
-        { source: '/ur/:currency-to-pkr', destination: '/ur/rate/:currency' },
+        // Urdu is switched off for now (ENABLED_LOCALES in i18n/routing.ts):
+        // /ur/* redirects to English above, so there are no Urdu rewrites.
+        // To bring it back, restore the /ur/compare/... and /ur/:currency-to-pkr
+        // rewrites from git history alongside re-enabling the locale.
 
         // ─── Unprefixed English routes ───────────────────────────────────
         { source: '/', destination: '/en' },

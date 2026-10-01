@@ -52,6 +52,8 @@ export async function generateMetadata({
     description: `Check the ${currency} to PKR exchange rate, rate history and available transfer quotes from ${corridor.articleName} to Pakistan. Compare fees and rupees received.`,
     path,
     alternates: alternatesFor(path),
+    // The same country's corridor card: flag, route and today's best rate.
+    image: `/og/corridor/${corridor.slug}.png`,
   })
 }
 

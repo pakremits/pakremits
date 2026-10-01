@@ -4,6 +4,7 @@ import { MobileNav } from '@/components/mobile-nav'
 import { ScrollTopLink } from '@/components/scroll-top-link'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { type Locale, localePath } from '@/i18n/routing'
+import { CORRIDORS } from '@/lib/corridors'
 import { corridorPath, methodPath, ratePath, staticPath } from '@/lib/routes'
 
 /**
@@ -204,28 +205,40 @@ export async function SiteHeader({
   )
 }
 
+/** Short names that fit a footer line; the rest use the corridor's own name. */
+const FOOTER_COUNTRY: Record<string, string> = { uk: 'UK', uae: 'UAE', usa: 'USA' }
+
 export async function SiteFooter({ locale = 'en' }: { locale?: Locale }) {
   const t = await getTranslations({ locale, namespace: 'footer' })
 
+  /*
+   * Every corridor, rate and payout page is linked from every page here, so
+   * none of them depends on the home page alone for internal links.
+   */
   const columns = [
     {
       heading: t('compare'),
-      links: [
-        { href: corridorPath('uk', locale), label: 'UK to Pakistan' },
-        { href: corridorPath('uae', locale), label: 'UAE to Pakistan' },
-        { href: corridorPath('saudi-arabia', locale), label: 'Saudi Arabia to Pakistan' },
-        { href: corridorPath('usa', locale), label: 'USA to Pakistan' },
-        { href: methodPath('jazzcash', locale), label: 'Send to JazzCash' },
-      ],
+      links: CORRIDORS.map((corridor) => ({
+        href: corridorPath(corridor.slug, locale),
+        label: `${FOOTER_COUNTRY[corridor.slug] ?? corridor.fromCountryName} to Pakistan`,
+      })),
     },
     {
       heading: t('rates'),
       links: [
-        { href: ratePath('gbp', locale), label: 'GBP to PKR' },
-        { href: ratePath('aed', locale), label: 'AED to PKR' },
-        { href: ratePath('sar', locale), label: 'SAR to PKR' },
-        { href: ratePath('usd', locale), label: 'USD to PKR' },
+        ...CORRIDORS.map((corridor) => ({
+          href: ratePath(corridor.fromCurrency, locale),
+          label: `${corridor.fromCurrency} to PKR`,
+        })),
         { href: `${localePath(locale, '/')}#alerts`, label: 'Rate alerts' },
+      ],
+    },
+    {
+      heading: t('receive'),
+      links: [
+        { href: methodPath('jazzcash', locale), label: 'JazzCash transfers' },
+        { href: methodPath('easypaisa', locale), label: 'Easypaisa transfers' },
+        { href: methodPath('rda', locale), label: 'Roshan Digital Account' },
       ],
     },
     {
@@ -233,6 +246,7 @@ export async function SiteFooter({ locale = 'en' }: { locale?: Locale }) {
       links: [
         { href: staticPath('how-we-rank', locale), label: 'How we rank' },
         { href: staticPath('providers', locale), label: 'All providers' },
+        { href: staticPath('about', locale), label: 'About PakRemits' },
         { href: staticPath('affiliate-disclosure', locale), label: 'Affiliate disclosure' },
         { href: staticPath('privacy', locale), label: 'Privacy' },
         { href: staticPath('contact', locale), label: 'Contact' },
@@ -243,7 +257,7 @@ export async function SiteFooter({ locale = 'en' }: { locale?: Locale }) {
   return (
     <footer className="mt-24 border-t border-line bg-footer px-0 pt-14 pb-10 text-ink">
       <div className="mx-auto max-w-[1120px] px-6">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
           <div>
             <Link href={localePath(locale, '/')} className="flex items-center no-underline">
               {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -17,6 +17,15 @@
 export const LOCALES = ['en', 'ur'] as const
 export type Locale = (typeof LOCALES)[number]
 
+/**
+ * The locales the site actually publishes. Urdu is switched off for now: its
+ * messages and page branches stay, but no Urdu page is built, linked, listed
+ * in the sitemap or advertised through hreflang, and /ur/* redirects to the
+ * English page (next.config.ts). To bring it back, add 'ur' here and restore
+ * the Urdu rewrites in next.config.ts.
+ */
+export const ENABLED_LOCALES: readonly Locale[] = ['en']
+
 export const DEFAULT_LOCALE: Locale = 'en'
 
 /** Urdu is right-to-left; this drives the `dir` attribute on <html>. */
@@ -62,12 +71,14 @@ export function localePath(locale: Locale, path: string): string {
  * `x-default` points at English, which is the wider audience for these pages.
  */
 export function alternatesFor(path: string) {
+  const canonical = localePath(DEFAULT_LOCALE, path)
+  // A single published language needs no hreflang: the canonical says it all.
+  if (ENABLED_LOCALES.length < 2) return { canonical }
   return {
-    canonical: localePath(DEFAULT_LOCALE, path),
+    canonical,
     languages: {
-      'en-GB': localePath('en', path),
-      'ur-PK': localePath('ur', path),
-      'x-default': localePath('en', path),
+      ...Object.fromEntries(ENABLED_LOCALES.map((locale) => [LOCALE_TAG[locale], localePath(locale, path)])),
+      'x-default': canonical,
     },
   }
 }

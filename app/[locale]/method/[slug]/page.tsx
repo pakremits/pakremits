@@ -39,7 +39,7 @@ export async function generateMetadata({
 
   const path = methodPath(slug)
   return publicPageMetadata({
-    title: `${content.title} | PakRemits`,
+    title: `${content.metaTitle ?? content.title} | PakRemits`,
     description: content.metaDescription,
     path,
     alternates: alternatesFor(path),

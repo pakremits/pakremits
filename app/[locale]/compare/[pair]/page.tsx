@@ -22,6 +22,7 @@ import { providers, rateQuotes } from '@/lib/db/schema'
 import { formatPkr } from '@/lib/ranking/compute'
 import { getComparison } from '@/lib/quotes'
 import { corridorPath } from '@/lib/routes'
+import { MIN_SHARED_CORRIDORS, getProviderCoverage, sharedCorridorCount } from '@/lib/coverage'
 import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
 export const revalidate = 900
@@ -90,10 +91,17 @@ export async function generateMetadata({
   const b = rows.find((r) => r.slug === parsed[1])
   if (!a || !b) return {}
 
+  // Only pairs that meet in enough corridors are a real comparison.
+  const coverage = await getProviderCoverage().catch(() => null)
+  const strong = coverage
+    ? sharedCorridorCount(coverage, a.slug, b.slug) >= MIN_SHARED_CORRIDORS
+    : true
+
   return publicPageMetadata({
     title: `${a.name} vs ${b.name}: transfer rates to Pakistan | PakRemits`,
     description: `Compare ${a.name} and ${b.name} for sending money to Pakistan. Check available exchange rates, fees, delivery options and rupees received.`,
     path: `/compare/${pair}`,
+    index: strong,
   })
 }
 

@@ -1,5 +1,6 @@
 'use server'
 
+import { assertAdmin } from '@/lib/admin/assert-admin'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
@@ -29,6 +30,7 @@ export async function updateBenchmark(
   _previous: BenchmarkFormState,
   formData: FormData,
 ): Promise<BenchmarkFormState> {
+  await assertAdmin()
   const parsed = BenchmarkSchema.safeParse(Object.fromEntries(formData))
 
   if (!parsed.success) {
@@ -76,6 +78,7 @@ export async function unpinBenchmark(
   _previous: BenchmarkFormState,
   formData: FormData,
 ): Promise<BenchmarkFormState> {
+  await assertAdmin()
   const corridorId = Number(formData.get('corridorId'))
   const deliveryMethod = String(formData.get('deliveryMethod'))
 

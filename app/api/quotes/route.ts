@@ -14,6 +14,7 @@ import { DELIVERY_METHODS } from '@/lib/db/schema'
 import { CORRIDORS } from '@/lib/corridors'
 import { getComparison } from '@/lib/quotes'
 import { SESSION_COOKIE, recordComparisonRun } from '@/lib/proof/events'
+import { allow, clientIp } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,12 +56,19 @@ export async function GET(request: Request) {
 
     // Count the comparison. Deduplicated to one per session per minute inside
     // recordComparisonRun, so dragging the amount field is one event, not forty.
+    //
+    // Only for a session we issued earlier: a request without the cookie gets
+    // one now and is not counted, so a client that drops cookies (a script
+    // looping on this URL) never adds to the public "comparisons this month"
+    // figure. A per-IP brake covers a script that keeps the cookie.
     const jar = await cookies()
     const storedSessionId = jar.get(SESSION_COOKIE)?.value
     const hasValidSession = Boolean(storedSessionId && UUID_PATTERN.test(storedSessionId))
     const sessionId = hasValidSession ? storedSessionId! : randomUUID()
 
-    await recordComparisonRun(sessionId, comparison.corridorId ?? null)
+    if (hasValidSession && allow(`quotes:${clientIp(request)}`, 30, 60 * 60 * 1000)) {
+      await recordComparisonRun(sessionId, comparison.corridorId ?? null)
+    }
 
     const response = NextResponse.json(comparison, {
       headers: {

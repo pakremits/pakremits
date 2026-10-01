@@ -19,7 +19,8 @@ import { providers } from '@/lib/db/schema'
 import { formatPkr } from '@/lib/ranking/compute'
 import { getComparison } from '@/lib/quotes'
 import { providerAvailability, providerSupportsCorridor } from '@/lib/providers/availability'
-import { corridorPath } from '@/lib/routes'
+import { comparePath, corridorPath } from '@/lib/routes'
+import { getProviderCoverage, strongPairs } from '@/lib/coverage'
 import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
 export const revalidate = 900
@@ -62,13 +63,19 @@ export async function generateMetadata({
   if (!provider) return {}
 
   const availability = providerAvailability(slug)
+  // No live quote anywhere: the page is mostly "not available" rows.
+  const coverage = await getProviderCoverage().catch(() => null)
+  const quoted = coverage ? (coverage.get(slug)?.size ?? 0) > 0 : true
 
   return publicPageMetadata({
-    title: `${provider.name} money transfer rates to Pakistan | PakRemits`,
+    // Not "money transfer rates": several names already end in "Money
+    // Transfer" or "Exchange", which made the title repeat itself.
+    title: `${provider.name} to Pakistan: rates and fees | PakRemits`,
     description: availability
-      ? `See where ${provider.name} sends money to Pakistan, supported payout methods and comparable quotes where available.`
-      : `Compare ${provider.name} transfer rates and fees to Pakistan with other available services. See the amount received in PKR.`,
+      ? `See which countries ${provider.name} sends money to Pakistan from, the payout methods it supports, and how its live rates compare with other services.`
+      : `Compare ${provider.name}'s exchange rate and fees for sending money to Pakistan with other services, and see exactly how many rupees arrive.`,
     path: `/providers/${slug}`,
+    index: quoted,
   })
 }
 
@@ -101,6 +108,20 @@ export default async function ProviderPage({ params }: { params: Promise<{ local
   )
 
   const served = perCorridor.filter((entry) => entry.row)
+
+  // Head-to-heads worth reading: other services this one meets in at least
+  // two corridors. These are the only links into those pages.
+  const coverage = await getProviderCoverage().catch(() => null)
+  const rivalSlugs = coverage
+    ? strongPairs(coverage)
+        .filter(([a, b]) => a === slug || b === slug)
+        .map(([a, b]) => (a === slug ? b : a))
+    : []
+  const rivals = rivalSlugs.length
+    ? (await db.select({ slug: providers.slug, name: providers.name }).from(providers)).filter((row) =>
+        rivalSlugs.includes(row.slug),
+      )
+    : []
   const winning = served.filter((entry) => entry.isBest).length
   const availability = providerAvailability(slug)
 
@@ -274,6 +295,26 @@ export default async function ProviderPage({ params }: { params: Promise<{ local
               })}
             </ul>
           </section>
+
+          {rivals.length > 0 && (
+            <section>
+              <h2 className="text-[26px] leading-tight font-semibold">
+                Compare {provider.name} head to head
+              </h2>
+              <ul className="mt-4 grid gap-2 text-[16px] sm:grid-cols-2">
+                {rivals.map((rival) => (
+                  <li key={rival.slug}>
+                    <Link
+                      href={comparePath(slug, rival.slug, locale)}
+                      className="text-leaf underline underline-offset-2 hover:text-leaf-dark"
+                    >
+                      {provider.name} vs {rival.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section>
             <h2 className="text-[26px] leading-tight font-semibold">How we make money from this</h2>

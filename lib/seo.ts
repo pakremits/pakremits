@@ -15,6 +15,7 @@ export function publicPageMetadata({
   alternates,
   image = '/opengraph-image',
   type = 'website',
+  index = true,
 }: {
   title: string
   description: string
@@ -22,18 +23,22 @@ export function publicPageMetadata({
   alternates?: Metadata['alternates']
   image?: string
   type?: 'website' | 'article'
+  /** False for thin pages: served and followed, but kept out of the index. */
+  index?: boolean
 }): Metadata {
   const url = new URL(path, site).toString()
   const imageUrl = new URL(image, site).toString()
   return {
     title,
     description,
+    ...(index ? {} : { robots: { index: false, follow: true } }),
     alternates: alternates ?? { canonical: path },
     openGraph: {
       title,
       description,
       url,
       siteName: 'PakRemits',
+      locale: 'en_GB',
       type,
       images: [{ url: imageUrl, width: 1200, height: 630, alt: title }],
     },

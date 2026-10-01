@@ -46,6 +46,8 @@ export async function generateMetadata({
 // after each refresh, and this is the backstop if that ping is ever missed.
 export const revalidate = 900
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+
 
 /**
  * The hero form opens on $1,000 from the USA, and the worked example, payout
@@ -81,18 +83,6 @@ const COUNTRY_BY_CURRENCY = new Map(
   CORRIDORS.map((corridor) => [corridor.fromCurrency, corridor.fromCountry]),
 )
 
-/**
- * These small marks appear in the search form's payout dropdown.
- * Resource hints start fetching them with the initial document so opening a
- * selector never has to wait for an image request.
- */
-const COMPARISON_IMAGE_ASSETS = [
-  '/payout-icons/jazzcash.png',
-  '/payout-icons/easypaisa.png',
-  '/payout-icons/sadapay.png',
-  '/payout-icons/nayapay.png',
-  '/payout-icons/rda.png',
-] as const
 
 
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
@@ -163,9 +153,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   return (
     <>
-      {COMPARISON_IMAGE_ASSETS.map((href) => (
-        <link key={href} rel="preload" as="image" href={href} type="image/png" />
-      ))}
 
       <SiteHeader locale={locale} />
 
@@ -497,14 +484,43 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
+          // WebSite gives Google the site name; Organization its logo and
+          // identity. FAQPage no longer earns a rich result for sites like this
+          // one, but stays valid markup for the questions on the page.
           __html: jsonLd({
             '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: faqs.map((faq) => ({
-              '@type': 'Question',
-              name: faq.q,
-              acceptedAnswer: { '@type': 'Answer', text: faq.a },
-            })),
+            '@graph': [
+              {
+                '@type': 'Organization',
+                '@id': `${SITE_URL}/#organization`,
+                name: 'PakRemits',
+                url: `${SITE_URL}/`,
+                logo: {
+                  '@type': 'ImageObject',
+                  url: `${SITE_URL}/pakremits-logo-512.png`,
+                  width: 512,
+                  height: 512,
+                },
+                description:
+                  'Independent comparison of money transfer services to Pakistan, ranked by the rupees that arrive.',
+              },
+              {
+                '@type': 'WebSite',
+                '@id': `${SITE_URL}/#website`,
+                name: 'PakRemits',
+                url: `${SITE_URL}/`,
+                inLanguage: 'en',
+                publisher: { '@id': `${SITE_URL}/#organization` },
+              },
+              {
+                '@type': 'FAQPage',
+                mainEntity: faqs.map((faq) => ({
+                  '@type': 'Question',
+                  name: faq.q,
+                  acceptedAnswer: { '@type': 'Answer', text: faq.a },
+                })),
+              },
+            ],
           }),
         }}
       />

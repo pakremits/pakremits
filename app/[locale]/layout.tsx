@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { GoogleTagManager } from '@next/third-parties/google'
 import { fonts } from '@/lib/fonts'
-import { LOCALES, LOCALE_DIR, LOCALE_TAG, isLocale } from '@/i18n/routing'
+import { ENABLED_LOCALES, LOCALE_DIR, LOCALE_TAG, isLocale } from '@/i18n/routing'
 import { getMessages } from '@/i18n/messages'
 import { NavigationScrollReset } from '@/components/navigation-scroll-reset'
 import { RateAlertDialog } from '@/components/rate-alert-dialog'
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 export const revalidate = 900
 
 export function generateStaticParams() {
-  return LOCALES.map((locale) => ({ locale }))
+  return ENABLED_LOCALES.map((locale) => ({ locale }))
 }
 
 export default async function LocaleLayout({

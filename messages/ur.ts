@@ -516,6 +516,7 @@ export const ur: Messages = {
     compare: 'موازنہ',
     // TODO: native review
     rates: 'ریٹ',
+    receive: 'وصولی کے طریقے',
     // Brand name stays in Latin script in Urdu copy — see the rebrand note in the README.
     brand: 'PakRemits',
     // TODO: native review

@@ -1,5 +1,6 @@
 'use server'
 
+import { assertAdmin } from '@/lib/admin/assert-admin'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -34,6 +35,7 @@ export async function saveManualQuote(
   _previous: OverrideState,
   formData: FormData,
 ): Promise<OverrideState> {
+  await assertAdmin()
   const parsed = OverrideSchema.safeParse(Object.fromEntries(formData))
 
   if (!parsed.success) {
@@ -84,6 +86,7 @@ export async function saveManualQuote(
 
 /** Options for the override form's selects. */
 export async function getFormOptions() {
+  await assertAdmin()
   const [providerRows, corridorRows] = await Promise.all([
     db.select({ id: providers.id, name: providers.name }).from(providers).orderBy(providers.name),
     db

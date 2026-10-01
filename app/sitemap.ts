@@ -1,132 +1,125 @@
 import type { MetadataRoute } from 'next'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { CORRIDORS } from '@/lib/corridors'
 import { db } from '@/lib/db'
 import { providers, rateQuotes } from '@/lib/db/schema'
 import { METHOD_CONTENT } from '@/lib/content/methods'
+import { getProviderCoverage, strongPairs } from '@/lib/coverage'
 import { methodPath } from '@/lib/routes'
 
 /**
  * Dynamic sitemap.
  *
- * Lists every canonical public page. Private alert URLs, admin/API routes,
- * affiliate redirects and the internal rewrite targets must stay out.
+ * Lists every canonical public page worth indexing. Private alert URLs,
+ * admin/API routes, affiliate redirects, the internal rewrite targets and the
+ * thin provider and head-to-head pages (served noindex, see lib/coverage.ts)
+ * stay out.
+ *
+ * `lastModified` is only given where it is true: pages built on live quotes
+ * changed when the newest quote was captured. Static pages carry none rather
+ * than a fresh "now" on every fetch, which search engines learn to ignore.
+ *
+ * No hreflang alternates: Urdu is switched off for now (ENABLED_LOCALES in
+ * i18n/routing.ts), and claiming an alternate that redirects is worse than
+ * omitting it.
  */
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
-/**
- * Attach hreflang alternates to an entry.
- *
- * Only the page types that actually have an Urdu version get them — claiming an
- * alternate that 404s or serves identical English is worse than omitting it,
- * because Google treats a broken hreflang cluster as a signal problem across
- * every page in it.
- */
-function withUrdu(path: string) {
-  return {
-    languages: {
-      'en-GB': `${SITE}${path}`,
-      'ur-PK': `${SITE}/ur${path === '/' ? '' : path}`,
-    },
+export const revalidate = 3600
+
+/** When the newest quote was captured, or undefined if the database is unreachable. */
+async function latestQuoteAt(): Promise<Date | undefined> {
+  try {
+    const [row] = await db
+      .select({ at: sql<string | null>`max(${rateQuotes.capturedAt})` })
+      .from(rateQuotes)
+    return row?.at ? new Date(row.at) : undefined
+  } catch (error) {
+    console.error('[sitemap] could not read the latest quote time:', error)
+    return undefined
   }
 }
 
-export const revalidate = 3600
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date()
+  const [quotedAt, coverage] = await Promise.all([
+    latestQuoteAt(),
+    getProviderCoverage().catch((error) => {
+      console.error('[sitemap] could not read provider coverage:', error)
+      return null
+    }),
+  ])
 
   const staticPages: MetadataRoute.Sitemap = [
-    {
-      url: `${SITE}/`,
-      lastModified: now,
-      changeFrequency: 'hourly',
-      priority: 1,
-      alternates: withUrdu('/'),
-    },
-    { url: `${SITE}/how-we-rank`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${SITE}/providers`, lastModified: now, changeFrequency: 'weekly', priority: 0.6 },
-    { url: `${SITE}/about`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE}/contact`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${SITE}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    {
-      url: `${SITE}/affiliate-disclosure`,
-      lastModified: now,
-      changeFrequency: 'yearly',
-      priority: 0.3,
-    },
+    { url: `${SITE}/`, lastModified: quotedAt, changeFrequency: 'hourly', priority: 1 },
+    { url: `${SITE}/how-we-rank`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE}/providers`, changeFrequency: 'weekly', priority: 0.6 },
+    { url: `${SITE}/about`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE}/contact`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE}/privacy`, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE}/affiliate-disclosure`, changeFrequency: 'yearly', priority: 0.3 },
   ]
 
   const corridorPages: MetadataRoute.Sitemap = CORRIDORS.map((corridor) => ({
     url: `${SITE}/compare/${corridor.slug}-to-pakistan`,
-    lastModified: now,
+    lastModified: quotedAt,
     changeFrequency: 'hourly' as const,
     priority: 0.9,
-    alternates: withUrdu(`/compare/${corridor.slug}-to-pakistan`),
   }))
 
   const ratePages: MetadataRoute.Sitemap = CORRIDORS.map((corridor) => ({
     url: `${SITE}/${corridor.fromCurrency.toLowerCase()}-to-pkr`,
-    lastModified: now,
+    lastModified: quotedAt,
     changeFrequency: 'hourly' as const,
     priority: 0.8,
-    alternates: withUrdu(`/${corridor.fromCurrency.toLowerCase()}-to-pkr`),
   }))
-
-  /** Public provider pages include catalogue-only providers and exclude the bank benchmark. */
-  let providerPages: MetadataRoute.Sitemap = []
-  try {
-    const rows = await db
-      .select({ slug: providers.slug })
-      .from(providers)
-      .where(and(eq(providers.active, true), eq(providers.isBenchmark, false)))
-
-    providerPages = rows.map((row) => ({
-      url: `${SITE}/providers/${row.slug}`,
-      lastModified: now,
-      changeFrequency: 'daily' as const,
-      priority: 0.5,
-    }))
-  } catch (error) {
-    // Keep the static and country pages available during a database outage.
-    console.error('[sitemap] could not list providers:', error)
-  }
 
   const methodPages: MetadataRoute.Sitemap = METHOD_CONTENT.map((entry) => ({
     url: `${SITE}${methodPath(entry.slug)}`,
-    lastModified: now,
+    lastModified: quotedAt,
     changeFrequency: 'daily' as const,
     priority: 0.7,
   }))
 
   /**
-   * Head-to-head pages, one per unordered pair of quotable providers. The
-   * alphabetically-first slug always leads — emitting both orders would create
-   * duplicates competing for the same query.
+   * Provider pages for services with a live quote somewhere. Catalogue-only
+   * providers keep their page, served noindex, but are not submitted.
    */
-  let comparePages: MetadataRoute.Sitemap = []
-  try {
-    const rows = await db
-      .selectDistinct({ slug: providers.slug })
-      .from(rateQuotes)
-      .innerJoin(providers, eq(rateQuotes.providerId, providers.id))
-      .where(and(eq(providers.active, true), eq(providers.isBenchmark, false)))
+  let providerPages: MetadataRoute.Sitemap = []
+  if (coverage) {
+    try {
+      const rows = await db
+        .select({ slug: providers.slug })
+        .from(providers)
+        .where(and(eq(providers.active, true), eq(providers.isBenchmark, false)))
 
-    const slugs = rows.map((r) => r.slug).sort()
-    for (let i = 0; i < slugs.length; i++) {
-      for (let j = i + 1; j < slugs.length; j++) {
-        comparePages.push({
-          url: `${SITE}/compare/${slugs[i]}-vs-${slugs[j]}`,
-          lastModified: now,
+      providerPages = rows
+        .filter((row) => (coverage.get(row.slug)?.size ?? 0) > 0)
+        .map((row) => ({
+          url: `${SITE}/providers/${row.slug}`,
+          lastModified: quotedAt,
           changeFrequency: 'daily' as const,
           priority: 0.5,
-        })
-      }
+        }))
+    } catch (error) {
+      // Keep the static and country pages available during a database outage.
+      console.error('[sitemap] could not list providers:', error)
     }
-  } catch (error) {
-    console.error('[sitemap] could not build comparison pairs:', error)
-    comparePages = []
   }
+
+  /**
+   * Head-to-head pages: only pairs quoted together in at least
+   * MIN_SHARED_CORRIDORS corridors. The alphabetically-first slug always
+   * leads; emitting both orders would create duplicates competing for the
+   * same query.
+   */
+  const comparePages: MetadataRoute.Sitemap = coverage
+    ? strongPairs(coverage).map(([a, b]) => ({
+        url: `${SITE}/compare/${a}-vs-${b}`,
+        lastModified: quotedAt,
+        changeFrequency: 'daily' as const,
+        priority: 0.5,
+      }))
+    : []
 
   return [
     ...staticPages,
