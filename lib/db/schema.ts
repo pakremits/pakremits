@@ -97,7 +97,7 @@ export const corridors = pgTable(
   'corridors',
   {
     id: serial('id').primaryKey(),
-    /** URL segment, e.g. `uk` → /send-money-from-uk-to-pakistan */
+    /** URL segment, e.g. `uk` → /compare/uk-to-pakistan */
     slug: text('slug').notNull().unique(),
     fromCurrency: text('from_currency', { enum: SEND_CURRENCIES }).notNull(),
     /** ISO 3166-1 alpha-2, e.g. GB. Providers key their APIs off country, not currency. */

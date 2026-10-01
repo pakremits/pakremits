@@ -43,7 +43,7 @@ export async function PayoutGuide({
         <p className="mt-3 text-[17px] text-muted">{t('payoutLede')}</p>
       </div>
 
-      <div className="mt-7 overflow-hidden rounded-panel bg-surface">
+      <div className="card-rise mt-7 overflow-hidden rounded-panel bg-surface">
         <ul className="grid lg:grid-cols-2">
           {rows.map((row) => (
             <li key={row.key}>

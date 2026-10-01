@@ -77,7 +77,8 @@ export async function SiteHeader({
 
   const logo = (
     <>
-      {/* The brand-sheet logo, teal and gold for a white bar. See public/pakrimits-new-logo.svg.
+      {/* The brand-sheet logo, teal and gold, in both themes: the teal still
+          reads on the dark bar. See public/pakrimits-new-logo.svg.
 
           Plain <img>, not next/image: the source is a static SVG, which the
           image optimiser passes through untouched anyway and only serves
@@ -88,16 +89,7 @@ export async function SiteHeader({
         alt="PakRemits"
         width={185}
         height={36}
-        className="h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:hidden"
-      />
-      {/* Dark theme: same mark, light wordmark. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/pakrimits-new-logo-dark.svg"
-        alt="PakRemits"
-        width={185}
-        height={36}
-        className="hidden h-6 w-auto sm:h-9 lg:h-7 xl:h-9 dark:block"
+        className="h-6 w-auto sm:h-9 lg:h-7 xl:h-9"
       />
     </>
   )
@@ -163,9 +155,9 @@ export async function SiteHeader({
           <Link
             href={alertHref}
             aria-label={t('rateAlert')}
-            className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-line bg-surface
+            className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-mist dark:bg-surface
                        text-[15px] font-semibold whitespace-nowrap text-ink no-underline
-                       transition-[border-color,box-shadow] hover:border-accent hover:shadow-[0_0_0_2px_var(--color-accent)]
+                       transition-shadow hover:shadow-[0_0_0_2px_var(--color-accent)]
                        sm:h-12 sm:w-auto sm:px-6"
           >
             <svg
@@ -260,15 +252,7 @@ export async function SiteFooter({ locale = 'en' }: { locale?: Locale }) {
                 alt="PakRemits"
                 width={185}
                 height={36}
-                className="h-9 w-auto dark:hidden"
-              />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/pakrimits-new-logo-dark.svg"
-                alt="PakRemits"
-                width={185}
-                height={36}
-                className="hidden h-9 w-auto dark:block"
+                className="h-9 w-auto"
               />
             </Link>
             {/* Affiliate disclosure. Required on every page carrying provider

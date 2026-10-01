@@ -124,7 +124,7 @@ export async function ProofStrip({
     <section className="mt-4" aria-label={t('stripLabel')}>
       {/* One ruled strip, not more cards: these are measurements, read side by side.
           -mb-px/-me-px tuck the outer cells' rules under the frame. */}
-      <div className="overflow-hidden rounded-panel border border-line">
+      <div className="card-rise overflow-hidden rounded-panel border border-line">
         <ul className="-me-px -mb-px grid sm:grid-cols-2 lg:grid-cols-4">
           {items.map((item) => (
             <li key={item.key} className={PROOF_CARD}>

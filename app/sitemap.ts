@@ -58,11 +58,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]
 
   const corridorPages: MetadataRoute.Sitemap = CORRIDORS.map((corridor) => ({
-    url: `${SITE}/send-money-from-${corridor.slug}-to-pakistan`,
+    url: `${SITE}/compare/${corridor.slug}-to-pakistan`,
     lastModified: now,
     changeFrequency: 'hourly' as const,
     priority: 0.9,
-    alternates: withUrdu(`/send-money-from-${corridor.slug}-to-pakistan`),
+    alternates: withUrdu(`/compare/${corridor.slug}-to-pakistan`),
   }))
 
   const ratePages: MetadataRoute.Sitemap = CORRIDORS.map((corridor) => ({

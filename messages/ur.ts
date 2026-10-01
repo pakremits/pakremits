@@ -524,6 +524,8 @@ export const ur: Messages = {
 
   common: {
     // TODO: native review
+    loadingSite: 'PakRemits لوڈ ہو رہا ہے',
+    // TODO: native review
     breadcrumb: 'راستہ',
     // TODO: native review
     otherCorridors: 'دیگر ممالک',

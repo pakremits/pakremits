@@ -189,12 +189,13 @@ export function IconSelect({
                 `absolute z-40 w-max ${listMinWidth} top-full mt-3 data-up:top-auto data-up:bottom-full data-up:mt-0 data-up:mb-3 max-w-[min(92vw,460px)] rounded-2xl
                  max-sm:left-1/2 max-sm:w-[calc(100%+32px)] max-sm:min-w-0 max-sm:max-w-none max-sm:-translate-x-1/2
                  flex flex-col gap-1 bg-surface p-2 shadow-[0_24px_60px_-20px_rgba(20,32,27,.35),0_2px_8px_rgba(20,32,27,.08)]
+                 dark:border dark:border-line dark:bg-header
                  before:absolute before:left-10 before:h-3 before:w-3 before:-top-1.5 data-up:before:top-auto data-up:before:-bottom-1.5
-                 before:rotate-45 before:bg-surface before:content-['']`
+                 before:rotate-45 before:bg-surface before:content-[''] dark:before:bg-header`
               : // At least the trigger's width, wider when an option needs it, so a
                 // narrow trigger (the currency switch) never truncates its list.
                 `absolute z-40 max-h-80 w-max min-w-full overflow-y-auto rounded-xl border top-full mt-2 data-up:top-auto data-up:bottom-full data-up:mt-0 data-up:mb-2
-                 border-line bg-surface p-1.5`
+                 border-line bg-surface p-1.5 dark:bg-header`
           }
         >
           {options.map((option, index) => (
@@ -216,7 +217,7 @@ export function IconSelect({
                      text-[18px] font-medium text-ink max-sm:gap-3 max-sm:px-3.5 max-sm:py-3 max-sm:text-[16px]
                      ${option.value === value || index === activeIndex ? 'bg-tint' : ''}`
                   : `flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-[15px]
-                     ${index === activeIndex ? 'bg-mist text-ink' : strongOptions ? 'text-ink' : 'text-muted'}
+                     ${index === activeIndex ? 'bg-mist text-ink dark:bg-line-2' : strongOptions ? 'text-ink' : 'text-muted'}
                      ${strongOptions ? 'font-bold' : option.value === value ? 'font-medium' : ''}`
               }
             >

@@ -8,14 +8,14 @@ describe('public page metadata', () => {
     const metadata = publicPageMetadata({
       title: 'Send money from the UK to Pakistan | PakRemits',
       description: 'Compare transfer rates and fees.',
-      path: '/send-money-from-uk-to-pakistan',
+      path: '/compare/uk-to-pakistan',
       image: '/og/corridor/uk.png',
     })
-    expect(metadata.alternates).toEqual({ canonical: '/send-money-from-uk-to-pakistan' })
+    expect(metadata.alternates).toEqual({ canonical: '/compare/uk-to-pakistan' })
     expect(metadata.openGraph).toMatchObject({
       title: metadata.title,
       description: metadata.description,
-      url: 'http://localhost:3000/send-money-from-uk-to-pakistan',
+      url: 'http://localhost:3000/compare/uk-to-pakistan',
       images: [{ url: 'http://localhost:3000/og/corridor/uk.png' }],
     })
     expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' })

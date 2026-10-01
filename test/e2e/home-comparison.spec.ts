@@ -42,7 +42,7 @@ async function compare(page: Page) {
 test.beforeEach(async ({ page }) => {
   // The live panel moved off the home page, which now has a search form that
   // hands off to /compare. Corridor pages still carry it in full.
-  await page.goto('/send-money-from-uk-to-pakistan')
+  await page.goto('/compare/uk-to-pakistan')
   // Wait for the server-rendered table rather than a fixed sleep.
   // Visible matches only: the desktop column headings carry the same words
   // and are hidden on phones.

@@ -227,7 +227,7 @@ export function ResultsView({
           </li>
         )}
 
-        {data.rows.map((row) => {
+        {data.rows.map((row, index) => {
           const q = row.quote
           const isBest = row.isBest
           const fast = (q.deliverySpeedMinutes ?? Number.POSITIVE_INFINITY) <= 600
@@ -235,7 +235,10 @@ export function ResultsView({
           return (
             <li
               key={q.providerSlug}
-              className={`${CARD} ${
+              // Rises in, staggered, when a list mounts (a new search); the
+              // payout bar inside reads the same --i and fills just after.
+              style={{ '--i': index } as React.CSSProperties}
+              className={`card-in ${CARD} ${
                             // The best deal wears the site's hover tint and the only
                             // visible border; the rest keep a clear one of the same
                             // width so every card's content lines up.
@@ -376,7 +379,7 @@ export function ResultsView({
                 </div>
                 <div className="my-3 h-1.5 overflow-hidden rounded-full bg-line-2">
                   <i
-                    className="block h-full rounded-full"
+                    className="bar-fill block h-full rounded-full"
                     style={{
                       width: `${row.barPercent}%`,
                       background: q.isBenchmark ? 'var(--color-bar-low)' : 'var(--color-bar)',

@@ -10,8 +10,14 @@
  */
 import { type Locale, localePath } from '@/i18n/routing'
 
+/*
+ * Every comparison page lives under /compare: corridors, payout rails and the
+ * provider head-to-heads. PakRemits compares; it does not send money, so the
+ * URLs say "compare" rather than "send money". The old /send-money-… URLs
+ * 301 here (next.config.ts).
+ */
 export function corridorPath(slug: string, locale: Locale = 'en'): string {
-  return localePath(locale, `/send-money-from-${slug}-to-pakistan`)
+  return localePath(locale, `/compare/${slug}-to-pakistan`)
 }
 
 export function ratePath(currency: string, locale: Locale = 'en'): string {
@@ -19,8 +25,9 @@ export function ratePath(currency: string, locale: Locale = 'en'): string {
 }
 
 export function methodPath(slug: string, locale: Locale = 'en'): string {
-  // The Roshan Digital Account page does not fit the "send money to X" pattern.
-  const path = slug === 'rda' ? '/roshan-digital-account-transfer' : `/send-money-to-${slug}`
+  // "rda" is spelled out: it is the phrase people search for.
+  const path =
+    slug === 'rda' ? '/compare/roshan-digital-account-transfers' : `/compare/${slug}-transfers`
   return localePath(locale, path)
 }
 

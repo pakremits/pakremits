@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent, type MouseEvent } from 'react'
+import { useEffect, useState, useSyncExternalStore, type FormEvent, type MouseEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useArrivalNavigation, useCompareNavigation } from '@/components/compare-navigation'
 import { IconSelect, type IconSelectOption } from '@/components/icon-select'
@@ -10,6 +10,7 @@ import { PAYOUT_OPTIONS } from '@/lib/payout'
 import { CURRENCY_SYMBOLS } from '@/lib/corridors'
 import { setCurrencyDisplay, useCurrencyDisplay, type CurrencyDisplay } from '@/lib/currency-display'
 import type { SendCurrency } from '@/lib/db/schema'
+import { detectVisitorCorridor } from '@/lib/visitor-corridor'
 
 /**
  * The search form in the home hero and at the top of /compare.
@@ -56,7 +57,17 @@ interface Props {
   bare?: boolean
   /** Told when a Compare navigation starts and when its page has rendered. */
   onPendingChange?: (pending: boolean) => void
+  /**
+   * Home only: open on the visitor's own corridor, guessed from the browser's
+   * timezone, with `initialAmount` (or 1000) in its currency. The server render
+   * keeps `initialCorridor`, so the cached page is the same for everyone; the
+   * switch happens as the page hydrates.
+   */
+  locateVisitor?: boolean
 }
+
+/** The timezone never changes under a loaded page, so nothing to subscribe to. */
+const subscribeNever = () => () => {}
 
 const DEFAULT_IDS = { from: 'search-from', method: 'search-method', amount: 'search-amount' }
 
@@ -107,6 +118,7 @@ export function CompareSearch({
   ids = DEFAULT_IDS,
   bare = false,
   onPendingChange,
+  locateVisitor = false,
 }: Props) {
   const t = useTranslations('panel')
   const tm = useTranslations('methods')
@@ -128,9 +140,21 @@ export function CompareSearch({
   }, [navigating, onPendingChange])
 
   const first = corridors.find((c) => c.slug === initialCorridor) ?? corridors[0]
-  const [corridor, setCorridor] = useState(first?.slug ?? 'uk')
+  // Null on the server and while hydrating, then the visitor's corridor.
+  const located = useSyncExternalStore(
+    subscribeNever,
+    () => (locateVisitor ? detectVisitorCorridor() : null),
+    () => null,
+  )
+  const local = corridors.find((c) => c.slug === located)
+  // Null until the visitor picks or types; until then the defaults follow
+  // `local`, so a pick is never overwritten by the location guess.
+  const [pickedCorridor, setCorridor] = useState<string | null>(null)
+  const [typedAmount, setAmountText] = useState<string | null>(null)
+  const corridor = pickedCorridor ?? local?.slug ?? first?.slug ?? 'uk'
+  const amountText =
+    typedAmount ?? String(initialAmount ?? (local ? 1000 : (first?.defaultAmount ?? 500)))
   const [payout, setPayout] = useState<PayoutOption>(initialPayout)
-  const [amountText, setAmountText] = useState(String(initialAmount ?? first?.defaultAmount ?? 500))
 
   const current = corridors.find((c) => c.slug === corridor) ?? first
 
@@ -246,7 +270,7 @@ export function CompareSearch({
     <span
       className={`flex h-full items-center font-semibold text-ink ${
         row ? 'text-[18px]' : 'text-[18px] sm:text-[20px]'
-      } ${flush ? '' : row ? 'px-4' : 'px-4 sm:px-5'}`}
+      } ${flush ? '' : 'ps-2 pe-4 sm:pe-5'}`}
       aria-label={labelText}
     >
       {text}
@@ -270,9 +294,9 @@ export function CompareSearch({
                         row ? 'px-4 text-[20px]' : 'px-4 text-[20px] sm:px-5 sm:text-[24px]'
                       }`}
         />
-        {/* Wide enough for the switch's arrow in every corridor, so the field
-            does not change size when the country does. */}
-        <div className={`${row ? 'w-[100px]' : 'w-[104px] sm:w-[116px]'} shrink-0`}>
+        {/* Hugs the code or symbol, so "$" takes less room than "USD"; the
+            amount input takes whatever is left. */}
+        <div className="shrink-0">
           {currencySymbol ? (
             <IconSelect
               id={`${ids.amount}-currency`}
@@ -284,8 +308,8 @@ export function CompareSearch({
               ]}
               onChange={(value) => setCurrencyDisplay(value as CurrencyDisplay)}
               strongOptions
-              className={`h-full w-full ps-4 pe-2.5 font-semibold text-ink focus:outline-none
-                          focus-visible:outline-none ${row ? 'text-[18px]' : 'text-[18px] sm:ps-5 sm:text-[20px]'}`}
+              className={`h-full w-full ps-2 pe-3 font-semibold text-ink focus:outline-none
+                          focus-visible:outline-none ${row ? 'text-[18px]' : 'text-[18px] sm:pe-4 sm:text-[20px]'}`}
             />
           ) : (
             staticValue(currencyCode, t('currency'))
@@ -414,17 +438,22 @@ export function CompareSearch({
     )
   }
 
+  /* Three tiles — country, payout, then amount and button — with the same
+     gap between them as around them, set on the page's own colour (mist in
+     light, the header colour in dark) so they read as panels on the card. */
+  const tile = 'min-w-0 rounded-[16px] bg-mist px-5 py-4 sm:px-7 sm:py-6 dark:bg-header'
+
   return (
-    <form onSubmit={onSubmit} className={formClass}>
-      <div className="grid sm:grid-cols-2">
-        <div className="min-w-0 px-5 py-4 sm:px-7 sm:py-6">
+    <form onSubmit={onSubmit} className={`${formClass} grid gap-3 p-3 sm:gap-4 sm:p-4`}>
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className={tile}>
           <label htmlFor={ids.from} className={labelClass}>
             {t('sendingFrom')}
           </label>
           {fromSelect(bigTrigger)}
         </div>
 
-        <div className="min-w-0 px-5 py-4 sm:px-7 sm:py-6">
+        <div className={tile}>
           <label htmlFor={ids.method} className={labelClass}>
             {t('recipientGets')}
           </label>
@@ -432,12 +461,12 @@ export function CompareSearch({
         </div>
       </div>
 
-      {/* "To" is only ever PKR, so its column hugs the text; the button takes
-          the width it frees up. On phones the amount and "To" share a row and
-          the button runs full width under them. */}
+      {/* "To" is only ever PKR, so its column hugs the text; at lg the amount
+          and the button split what is left about evenly. On phones the amount
+          and "To" share a row and the button runs full width under them. */}
       <div
-        className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-3 gap-y-4 px-5 py-4
-                   sm:grid-cols-1 sm:gap-5 sm:px-7 sm:py-7 lg:grid-cols-[minmax(0,1fr)_auto_250px] lg:gap-6"
+        className={`${tile} grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-3 gap-y-4
+                    sm:grid-cols-1 sm:gap-5 lg:grid-cols-[minmax(0,1.1fr)_auto_minmax(250px,1fr)] lg:gap-6`}
       >
         {amountField}
         {receiveField}
