@@ -32,6 +32,7 @@ describe('rate chart ranges', () => {
 
   it('needs intraday captures for 24h', () => {
     expect(rangeAvailable(history(55), '24h')).toBe(false)
+    expect(rangeAvailable(history(55, 2), '24h')).toBe(false)
     expect(rangeAvailable(history(55, 96), '24h')).toBe(true)
   })
 

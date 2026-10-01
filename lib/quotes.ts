@@ -377,7 +377,14 @@ export async function getMidMarketSeries(
         ${midMarketRates.rate} AS rate
       FROM ${midMarketRates}
       WHERE ${midMarketRates.fromCurrency} = ${currency}
-        AND ${midMarketRates.capturedAt} > now() - make_interval(days => ${days})
+        -- Counted back from this currency's newest reading, not from now: if
+        -- the refresh stalls, a "7-day" series must still cover the 7 days
+        -- before the "refreshed at" time the page shows, not shrink to the
+        -- one or two readings left inside a window that runs to today.
+        AND ${midMarketRates.capturedAt} > (
+          SELECT max(latest.captured_at) FROM ${midMarketRates} AS latest
+          WHERE latest.from_currency = ${currency}
+        ) - make_interval(days => ${days})
       ORDER BY day, ${midMarketRates.capturedAt} DESC
     `),
   )) as unknown as { day: Date; rate: string }[]
@@ -426,7 +433,11 @@ export async function getMidMarketHistory(currency: SendCurrency, days = 90): Pr
         SELECT ${midMarketRates.capturedAt} AS at, ${midMarketRates.rate} AS rate
         FROM ${midMarketRates}
         WHERE ${midMarketRates.fromCurrency} = ${currency}
-          AND ${midMarketRates.capturedAt} > now() - interval '24 hours'
+          -- The 24 hours before the newest reading (see getMidMarketSeries).
+          AND ${midMarketRates.capturedAt} > (
+            SELECT max(latest.captured_at) FROM ${midMarketRates} AS latest
+            WHERE latest.from_currency = ${currency}
+          ) - interval '24 hours'
         ORDER BY ${midMarketRates.capturedAt}
       `),
     ) as unknown as Promise<{ at: Date | string; rate: string }[]>,

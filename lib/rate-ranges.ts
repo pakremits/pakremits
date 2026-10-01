@@ -37,7 +37,8 @@ const MIN_COVERAGE = 0.8
  * when it reaches clearly further back than the longest fixed range that is.
  */
 export function rangeAvailable(history: RateHistory, range: RangeKey): boolean {
-  if (range === '24h') return history.intraday.length >= 2
+  // A handful of captures, not two: two readings draw a straight line, not a day.
+  if (range === '24h') return history.intraday.length >= 4
   const daily = history.daily
   if (daily.length < 2) return false
   const covered = daily[daily.length - 1].t - daily[0].t
