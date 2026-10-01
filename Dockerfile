@@ -50,6 +50,13 @@ FROM base
 # Copy built application
 COPY --from=build /app /app
 
+# Commit this image was built from, reported by /api/health so the deploy
+# pipeline can confirm which release is serving. Declared in this final stage
+# only: the build stage never sees it, so a new SHA leaves the npm ci and
+# next build layers cached.
+ARG GIT_SHA
+ENV GIT_SHA=${GIT_SHA}
+
 # Entrypoint sets up the container.
 ENTRYPOINT [ "/app/docker-entrypoint.mjs" ]
 

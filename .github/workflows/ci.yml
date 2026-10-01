@@ -1,0 +1,189 @@
+name: CI
+
+# Pull requests into main and pushes to main run the checks. A push to main
+# (every merged PR is one) that passes them deploys the Fly staging app.
+# Production (fly.toml, app `pakremits`) does not exist on Fly yet.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to a PR cancels that PR's previous run. Each push to main gets its
+# own group so every commit on main is verified; deploys queue separately below.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # Naming the shell runs steps with -eo pipefail; the implicit default omits
+    # pipefail, which would hide a failing command in the middle of a pipe.
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      # Leave NEXT_PUBLIC_SITE_URL and ROBOTS_ALLOW_INDEXING unset: the seo and
+      # site-indexing tests assert the localhost defaults.
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0 # keep in step with NODE_VERSION in the Dockerfile
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # The Docker build compiles with no type check and no lint, so these two
+      # steps are the only type and lint gates before a deploy.
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      # Same command as the Dockerfile's build stage. No database needed: pages
+      # are prerendered when the container boots.
+      - name: Build (compile mode)
+        run: npx next build --experimental-build-mode compile
+
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine # match the Managed Postgres major version
+        env:
+          POSTGRES_PASSWORD: ci # throwaway container
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://postgres:ci@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Apply every migration to an empty database
+        run: node scripts/migrate.mjs
+      - name: A second run applies nothing
+        run: |
+          out="$(node scripts/migrate.mjs)"
+          echo "$out"
+          grep -q 'applied 0 migration' <<<"$out"
+
+  deploy-staging:
+    needs: [verify, migrations]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: https://stage.pakremits.com
+    # One deploy at a time, never cancelled halfway. `queue: max` keeps every
+    # pending deploy rather than replacing it; the guard below lets only main's
+    # tip deploy, so the newest commit always gets its turn.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+      queue: max
+    env:
+      FLY_APP: pakremits-staging
+      FLY_CONFIG: fly.staging.toml
+      SITE_URL: https://stage.pakremits.com
+      NO_COLOR: '1'
+    steps:
+      # Runs can finish out of order, and "Re-run" on an old run would
+      # otherwise downgrade staging.
+      - name: Skip unless this commit is still main's tip
+        id: guard
+        run: |
+          head="$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" refs/heads/main | cut -f1)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::main is now at $head; its own run deploys it"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.guard.outputs.skip != 'true'
+        with:
+          persist-credentials: false # keep the job token out of the Docker build context
+
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # same pin as refresh-rates.yml
+        if: steps.guard.outputs.skip != 'true'
+
+      - name: Record the image staging is serving
+        id: previous
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN }}
+        run: |
+          : "${FLY_API_TOKEN:?FLY_DEPLOY_TOKEN is missing from the staging environment}"
+          image="$(flyctl machines list --app "$FLY_APP" --json \
+            | jq -r '[.[] | select(.config.metadata.fly_process_group == "app")][0].config.image // empty')"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "Serving ${image:-unknown}"
+
+      - name: Deploy (pending migrations run first as the release command)
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN }}
+        run: |
+          flyctl deploy --config "$FLY_CONFIG" --app "$FLY_APP" --remote-only \
+            --build-arg "GIT_SHA=$GITHUB_SHA" \
+            --image-label "main-${GITHUB_SHA::12}" \
+            --yes
+
+      # GET requests only. Never /go/* or /api/quotes: they write the affiliate
+      # clicks and comparison events behind the site's public proof figures.
+      - name: Smoke test
+        id: smoke
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          commit=""
+          for _ in $(seq 1 24); do
+            commit="$(curl -fsS --max-time 10 "$SITE_URL/api/health" | jq -r '.commit // empty' || true)"
+            [ "$commit" = "$GITHUB_SHA" ] && break
+            sleep 5
+          done
+          [ "$commit" = "$GITHUB_SHA" ] \
+            || { echo "::error::/api/health reports '${commit:-nothing}', expected $GITHUB_SHA"; exit 1; }
+
+          for path in / /ur /compare /send-money-from-uk-to-pakistan /gbp-to-pkr /providers /how-we-rank /sitemap.xml; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 --retry 2 --retry-delay 5 "$SITE_URL$path" || true)"
+            echo "$code $path"
+            [ "$code" = 200 ] || { echo "::error::GET $path returned $code"; exit 1; }
+          done
+
+          # Staging must stay out of search indexes. Bodies are captured before
+          # grepping: `curl | grep -q` can fail under pipefail when grep exits early.
+          robots="$(curl -fsS --max-time 10 "$SITE_URL/robots.txt")"
+          grep -qx 'Disallow: /' <<<"$robots" || { echo "::error::robots.txt allows crawling"; exit 1; }
+          home="$(curl -fsS --max-time 30 "$SITE_URL/")"
+          grep -q 'name="robots" content="noindex' <<<"$home" || { echo "::error::home page lost noindex"; exit 1; }
+
+          echo "Deployed \`${GITHUB_SHA::12}\` to $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      # Blue-green already keeps the old Machine when the new one never becomes
+      # healthy; this covers a release that boots but serves the wrong thing.
+      # The job still fails, and migrations are not reversed.
+      - name: Roll back to the previous image
+        if: failure() && steps.smoke.outcome == 'failure' && steps.previous.outputs.image != ''
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_DEPLOY_TOKEN }}
+          PREVIOUS_IMAGE: ${{ steps.previous.outputs.image }}
+        run: |
+          echo "::error::Smoke test failed; redeploying $PREVIOUS_IMAGE"
+          flyctl deploy --config "$FLY_CONFIG" --app "$FLY_APP" \
+            --image "$PREVIOUS_IMAGE" --skip-release-command --yes

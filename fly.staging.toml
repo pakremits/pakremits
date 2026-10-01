@@ -1,4 +1,5 @@
-# Staging application. Deploy this config from waheed_branch before merging.
+# Staging application (https://stage.pakremits.com). .github/workflows/ci.yml
+# deploys it after every push to main that passes CI; manual deploys still work.
 app = "pakremits-staging"
 primary_region = "sin"
 
@@ -10,6 +11,17 @@ primary_region = "sin"
   NEXT_PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAAE_350mcTdqSXIkb"
   NEXT_PUBLIC_GTM_ID = "GTM-N4ZV897G"
   ROBOTS_ALLOW_INDEXING = "false"
+
+[deploy]
+  # Pending Drizzle migrations run in one transaction, in a one-off Machine with
+  # the app's secrets, before any Machine is replaced; a failure stops the
+  # deploy. The release still serving must keep working on the migrated schema.
+  # Keep it free of quotes: docker-entrypoint.mjs re-joins argv with spaces.
+  release_command = "node scripts/migrate.mjs"
+  # Boot the new Machine beside the old one and move traffic only once its
+  # health check passes. Each boot prerenders ~100 pages (~30s), which a
+  # rolling deploy of this single Machine served as downtime.
+  strategy = "bluegreen"
 
 [env]
   HOSTNAME = "0.0.0.0"
@@ -30,8 +42,10 @@ primary_region = "sin"
   processes = ["app"]
 
 [[http_service.checks]]
+  # `/`, not /api/health: the server only listens once the boot-time prerender
+  # has finished, so a passing `/` means this release can serve pages.
   grace_period = "30s"
-  interval = "30s"
+  interval = "15s"
   method = "GET"
   path = "/"
   timeout = "5s"

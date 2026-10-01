@@ -48,3 +48,7 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Not needed in the image, and a CI checkout's .git can hold credentials.
+.git
+.github
