@@ -108,8 +108,12 @@ jobs:
       # otherwise downgrade staging.
       - name: Skip unless this commit is still main's tip
         id: guard
+        env:
+          # Authenticated, so the check does not depend on the repository
+          # being public; an anonymous ls-remote failed during its transfer.
+          GH_TOKEN: ${{ github.token }}
         run: |
-          head="$(git ls-remote "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" refs/heads/main | cut -f1)"
+          head="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
           if [ "$head" != "$GITHUB_SHA" ]; then
             echo "::notice::main is now at $head; its own run deploys it"
             echo "skip=true" >> "$GITHUB_OUTPUT"

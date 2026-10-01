@@ -57,8 +57,12 @@ COPY --from=build /app /app
 ARG GIT_SHA
 ENV GIT_SHA=${GIT_SHA}
 
-# Entrypoint sets up the container.
-ENTRYPOINT [ "/app/docker-entrypoint.mjs" ]
+# Entrypoint sets up the container. Started through node rather than run as an
+# executable: git stores the script without an execute bit (Windows checkouts
+# cannot record one), and a Linux checkout in CI keeps that mode, so the image
+# would hold a script the kernel refuses to run. Deploys from Windows hid this
+# because Docker marks every file in a Windows build context executable.
+ENTRYPOINT [ "node", "/app/docker-entrypoint.mjs" ]
 
 # Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
