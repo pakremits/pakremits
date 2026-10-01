@@ -1,7 +1,7 @@
 /**
  * Corridor pages — the SEO core.
  *
- * Public URL is /send-money-from-[slug]-to-pakistan, mapped here by a rewrite
+ * Public URL is /compare/[slug]-to-pakistan, mapped here by a rewrite
  * in next.config.ts because Next cannot express a partial dynamic segment.
  * Every canonical, sitemap entry and internal link uses the public form; this
  * path should never be linked directly.
@@ -41,7 +41,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
 /** The public URL for a corridor, which is what everything must point at. */
 export function corridorPath(slug: string): string {
-  return `/send-money-from-${slug}-to-pakistan`
+  return `/compare/${slug}-to-pakistan`
 }
 
 const TODAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })

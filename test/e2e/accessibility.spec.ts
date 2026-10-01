@@ -10,7 +10,7 @@ import { expect, test } from '@playwright/test'
  */
 
 /** The live panel lives on the corridor pages; home hands off to /compare. */
-const PANEL_PAGE = '/send-money-from-uk-to-pakistan'
+const PANEL_PAGE = '/compare/uk-to-pakistan'
 
 test('the comparison panel is fully operable by keyboard', async ({ page }) => {
   await page.goto(PANEL_PAGE)
@@ -100,7 +100,7 @@ test('results are announced through a live region', async ({ page }) => {
 })
 
 test('every page has one h1 and a labelled main landmark', async ({ page }) => {
-  for (const path of ['/', '/send-money-from-uk-to-pakistan', '/gbp-to-pkr', '/how-we-rank']) {
+  for (const path of ['/', '/compare/uk-to-pakistan', '/gbp-to-pkr', '/how-we-rank']) {
     await page.goto(path)
     await expect(page.locator('h1'), `${path} should have exactly one h1`).toHaveCount(1)
     expect(await page.locator('img:not([alt])').count(), `${path} has an image without alt`).toBe(0)
@@ -116,7 +116,7 @@ test('the Urdu page declares its language and direction', async ({ page }) => {
 
 test('no page scrolls horizontally on a phone', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 })
-  for (const path of ['/', '/ur', '/send-money-from-uk-to-pakistan', '/gbp-to-pkr']) {
+  for (const path of ['/', '/ur', '/compare/uk-to-pakistan', '/gbp-to-pkr']) {
     await page.goto(path)
     const overflow = await page.evaluate(() => {
       const de = document.documentElement

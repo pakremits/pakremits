@@ -141,7 +141,7 @@ npm run dev
 
 Public URLs do not match the file router, for two reasons documented in
 `next.config.ts`: Next dynamic segments must be a whole path segment (so
-`send-money-from-[slug]-to-pakistan` is not expressible as a folder), and
+`compare/[slug]-to-pakistan` is not expressible as a folder), and
 English is served unprefixed while pages live under `/[locale]`. Both are
 handled by explicit rewrites.
 

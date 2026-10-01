@@ -96,7 +96,9 @@ export function MobileNav({
   }, [open])
 
   const square =
-    'flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-line text-ink'
+    // Same soft fill as the bell beside it in the bar, no outline.
+    'flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-mist text-ink transition-shadow ' +
+    'hover:shadow-[0_0_0_2px_var(--color-accent)] dark:bg-surface'
 
   return (
     <div className="lg:hidden">

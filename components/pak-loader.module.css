@@ -1,0 +1,114 @@
+.overlay {
+  --pr-green: #14936f;
+  --pr-gold: #e0a513;
+  --pr-splash-bg: var(--color-surface);
+
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: var(--pr-splash-bg);
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+/* The background follows --color-surface; only the logo green needs a
+   lighter dark-theme value. */
+:global(html[data-theme='dark']) .overlay {
+  --pr-green: #2fb388;
+}
+
+/* SPLASH_SCRIPT marks <html> before paint on repeat loads, so it never flashes. */
+:global(html[data-splash-seen]) .overlay {
+  display: none;
+}
+
+.exit {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.logo {
+  width: min(78vw, 420px);
+  height: auto;
+  overflow: visible;
+}
+
+/* 1. R outline draws itself, then fills in */
+.r {
+  fill: var(--pr-green);
+  fill-opacity: 0;
+  stroke: var(--pr-green);
+  stroke-width: 140; /* path units: about 1.75px at full size */
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.8s cubic-bezier(0.6, 0, 0.3, 1) forwards,
+    fill 0.35s 0.55s ease-out forwards;
+}
+
+/* 2. Arrow shoots through the R, then keeps "sending" while the page loads */
+.arrow {
+  fill: var(--pr-gold);
+  opacity: 0;
+  transform: translateX(-40px);
+  animation: shoot 0.45s 0.8s cubic-bezier(0.2, 0.9, 0.3, 1.25) forwards,
+    send 1.4s 2.2s ease-in-out infinite;
+}
+
+.streak {
+  stroke: var(--pr-gold);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: right center;
+  animation: streak 0.5s 0.85s ease-out forwards;
+}
+
+/* 3. Letters rise one by one */
+.ch {
+  fill: var(--pr-green);
+  opacity: 0;
+  transform: translateY(18px);
+  animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation-delay: calc(1.05s + var(--i) * 45ms);
+}
+
+/* 4. Gold dots drop onto the i's like coins */
+.dot {
+  fill: var(--pr-gold);
+  opacity: 0;
+  transform: translateY(-36px);
+  animation: drop 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) forwards;
+  animation-delay: calc(1.55s + var(--d) * 120ms);
+}
+
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fill { to { fill-opacity: 1; stroke-opacity: 0; } }
+@keyframes shoot {
+  0% { opacity: 0; transform: translateX(-40px); }
+  30% { opacity: 1; }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes send {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+}
+@keyframes streak {
+  0% { opacity: 0; transform: scaleX(0.2); }
+  40% { opacity: 0.8; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1) translateX(10px); }
+}
+@keyframes rise { to { opacity: 1; transform: translateY(0); } }
+@keyframes drop {
+  0% { opacity: 0; transform: translateY(-36px); }
+  25% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streak { animation: none; opacity: 0; }
+  .r { animation: none; fill-opacity: 1; stroke-opacity: 0; }
+  .arrow, .ch, .dot { animation: none; opacity: 1; transform: none; }
+}

@@ -184,6 +184,116 @@ body {
   background: linear-gradient(61deg, #024e38 0%, #0e644b 60%, #077c5c 100%);
 }
 
+/* Theme switch: a short cross-fade of the colours. The class is on <html>
+   only for the length of the fade. The toggle's icons are left out, so their
+   own turn-and-scale transition is not overridden. */
+html.theme-fade,
+html.theme-fade *:not(.theme-icon),
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition:
+    background-color 0.36s ease,
+    border-color 0.36s ease,
+    color 0.36s ease,
+    fill 0.36s ease,
+    stroke 0.36s ease !important;
+}
+
+/* Card motion. Three small things, each tied to something happening:
+   - card-lift: a clickable card rises 2px on hover and settles on press.
+     Only on cards that are links, so nothing else pretends to be clickable.
+   - card-in / bar-fill: result cards rise in one after another when a search
+     lands (the list remounts), and each payout bar fills from zero — the
+     moment new numbers arrive.
+   - card-rise: cards rise and fade in once as they scroll into view, on a
+     timed transition started by ScrollReveal (components/scroll-reveal.tsx).
+   The entrances use `transform`, the hover uses `translate`, so the two
+   never fight over one property. `--i` is the card's place in its group. */
+.card-lift {
+  transition:
+    translate 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s ease,
+    border-color 0.2s ease;
+}
+.card-lift:hover {
+  translate: 0 -2px;
+  box-shadow: 0 16px 30px -20px rgba(20, 32, 27, 0.4);
+}
+.card-lift:active {
+  translate: 0 0;
+  transition-duration: 0.1s;
+}
+[data-theme='dark'] .card-lift:hover {
+  box-shadow: 0 16px 30px -18px rgba(0, 0, 0, 0.65);
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.card-in {
+  animation: card-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.bar-fill {
+  transform-origin: left;
+  animation: bar-grow 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 150ms);
+}
+[dir='rtl'] .bar-fill {
+  transform-origin: right;
+}
+
+/* card-rise: hidden only once ScrollReveal has started (it adds
+   .reveal-ready), so without JS nothing is ever hidden. Revealed cards rise
+   24px and fade in; each card in a group starts 90ms after the one before.
+   The delay is on opacity and transform only, so hover stays immediate. */
+.reveal-ready .card-rise:not(.is-revealed) {
+  opacity: 0;
+  transform: translateY(24px);
+}
+.card-rise {
+  transition:
+    opacity 0.6s ease,
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--i, 0) * 90ms), calc(var(--i, 0) * 90ms);
+}
+/* Cards that also lift on hover need both sets in one list, or one rule's
+   `transition` would replace the other's. */
+.card-rise.card-lift {
+  transition:
+    opacity 0.6s ease,
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    translate 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s ease,
+    border-color 0.2s ease;
+  transition-delay: calc(var(--i, 0) * 90ms), calc(var(--i, 0) * 90ms), 0s, 0s, 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-lift,
+  .card-lift:hover,
+  .card-lift:active {
+    transition: none;
+    translate: none;
+  }
+  .card-in,
+  .bar-fill {
+    animation: none;
+  }
+  .card-rise {
+    transition: none;
+  }
+}
+
 /* Scroll lock for every overlay. A modal <dialog> blocks clicks on the page
    but not scrolling, and locking <body> alone is not enough on iOS Safari —
    the lock has to be on <html>. Native dialogs (rate alert, compare sheet)
@@ -409,6 +519,8 @@ dialog {
   inset-inline-end: -10%;
   height: 70%;
   opacity: 0.36;
+  /* Softened just enough to sit behind the rate without competing with it. */
+  filter: blur(3px);
 }
 
 [data-theme='dark'] .flag-mark.flag-mark--corner {
@@ -423,6 +535,8 @@ dialog {
 .flag-mark.flag-mark--bar {
   height: 170px;
   opacity: 0.24;
+  /* Softened so the stripes and stars stay a wash behind the labels. */
+  filter: blur(4px);
 }
 
 .flag-mark--bar-start {

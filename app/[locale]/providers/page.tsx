@@ -83,12 +83,13 @@ export default async function ProvidersPage({
         </p>
 
         <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {real.map((provider) => (
+          {real.map((provider, index) => (
             <Link
               key={provider.slug}
               href={`/providers/${provider.slug}`}
-              className="rounded-panel border border-line bg-surface p-6 no-underline transition-all
-                         hover:-translate-y-px hover:border-leaf"
+              style={{ '--i': index % 3 } as React.CSSProperties}
+              className="card-rise card-lift rounded-panel border border-line bg-surface p-6 no-underline
+                         transition-[border-color] hover:border-leaf"
             >
               <div className="flex items-center gap-3.5">
                 <ProviderLogo

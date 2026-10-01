@@ -12,7 +12,7 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
  * to publish do not match the shape Next's file router can express.
  *
  * 1. **Pretty URLs.** Next dynamic segments must be a whole path segment, so
- *    `send-money-from-[slug]-to-pakistan` is not expressible as a folder. The
+ *    `compare/[slug]-to-pakistan` is not expressible as a folder. The
  *    pages live at `/corridor/[slug]`, `/rate/[currency]` and `/method/[slug]`,
  *    and these rewrites expose the public form. robots.txt disallows the
  *    internal forms so the two never compete for the same ranking signal.
@@ -100,37 +100,31 @@ const nextConfig: NextConfig = {
       { source: '/en', destination: '/', permanent: true },
       { source: '/en/:path*', destination: '/:path*', permanent: true },
 
+      /**
+       * The comparison pages moved from /send-money-… to /compare/… (PakRemits
+       * compares services; it does not send money). Permanent, so search
+       * engines move each page's ranking to its new address. Urdu first: the
+       * English patterns would not match a /ur/ path anyway, but keeping each
+       * locale's group together reads better.
+       */
+      { source: '/send-money-from-:slug-to-pakistan', destination: '/compare/:slug-to-pakistan', permanent: true },
+      { source: '/roshan-digital-account-transfer', destination: '/compare/roshan-digital-account-transfers', permanent: true },
+      { source: '/send-money-to-:slug', destination: '/compare/:slug-transfers', permanent: true },
+      { source: '/ur/send-money-from-:slug-to-pakistan', destination: '/ur/compare/:slug-to-pakistan', permanent: true },
+      { source: '/ur/roshan-digital-account-transfer', destination: '/ur/compare/roshan-digital-account-transfers', permanent: true },
+      { source: '/ur/send-money-to-:slug', destination: '/ur/compare/:slug-transfers', permanent: true },
+
       // Old/internal router paths occasionally escape through copied URLs.
       // Send valid-looking ones to their public equivalents instead of 404ing
       // or exposing a second Urdu URL for the same page.
-      {
-        source: '/corridor/:slug',
-        destination: '/send-money-from-:slug-to-pakistan',
-        permanent: true,
-      },
+      { source: '/corridor/:slug', destination: '/compare/:slug-to-pakistan', permanent: true },
       { source: '/rate/:currency', destination: '/:currency-to-pkr', permanent: true },
-      {
-        source: '/method/rda',
-        destination: '/roshan-digital-account-transfer',
-        permanent: true,
-      },
-      { source: '/method/:slug', destination: '/send-money-to-:slug', permanent: true },
-      {
-        source: '/ur/corridor/:slug',
-        destination: '/ur/send-money-from-:slug-to-pakistan',
-        permanent: true,
-      },
+      { source: '/method/rda', destination: '/compare/roshan-digital-account-transfers', permanent: true },
+      { source: '/method/:slug', destination: '/compare/:slug-transfers', permanent: true },
+      { source: '/ur/corridor/:slug', destination: '/ur/compare/:slug-to-pakistan', permanent: true },
       { source: '/ur/rate/:currency', destination: '/ur/:currency-to-pkr', permanent: true },
-      {
-        source: '/ur/method/rda',
-        destination: '/ur/roshan-digital-account-transfer',
-        permanent: true,
-      },
-      {
-        source: '/ur/method/:slug',
-        destination: '/ur/send-money-to-:slug',
-        permanent: true,
-      },
+      { source: '/ur/method/rda', destination: '/ur/compare/roshan-digital-account-transfers', permanent: true },
+      { source: '/ur/method/:slug', destination: '/ur/compare/:slug-transfers', permanent: true },
     ]
   },
 
@@ -149,15 +143,18 @@ const nextConfig: NextConfig = {
         { source: '/og/corridor/:slug.png', destination: '/en/corridor/:slug/opengraph-image' },
 
         // ─── Pretty URLs, English ────────────────────────────────────────
-        { source: '/send-money-from-:slug-to-pakistan', destination: '/en/corridor/:slug' },
-        { source: '/roshan-digital-account-transfer', destination: '/en/method/rda' },
-        { source: '/send-money-to-:slug', destination: '/en/method/:slug' },
+        // Before /compare/:pair below, which would otherwise claim them. The
+        // RDA page is listed ahead of the general "-transfers" pattern, which
+        // would also match it.
+        { source: '/compare/:slug-to-pakistan', destination: '/en/corridor/:slug' },
+        { source: '/compare/roshan-digital-account-transfers', destination: '/en/method/rda' },
+        { source: '/compare/:slug-transfers', destination: '/en/method/:slug' },
         { source: '/:currency-to-pkr', destination: '/en/rate/:currency' },
 
         // ─── Pretty URLs, Urdu ───────────────────────────────────────────
-        { source: '/ur/send-money-from-:slug-to-pakistan', destination: '/ur/corridor/:slug' },
-        { source: '/ur/roshan-digital-account-transfer', destination: '/ur/method/rda' },
-        { source: '/ur/send-money-to-:slug', destination: '/ur/method/:slug' },
+        { source: '/ur/compare/:slug-to-pakistan', destination: '/ur/corridor/:slug' },
+        { source: '/ur/compare/roshan-digital-account-transfers', destination: '/ur/method/rda' },
+        { source: '/ur/compare/:slug-transfers', destination: '/ur/method/:slug' },
         { source: '/ur/:currency-to-pkr', destination: '/ur/rate/:currency' },
 
         // ─── Unprefixed English routes ───────────────────────────────────

@@ -52,7 +52,7 @@ export async function ProviderRoster({
         </Link>
       </div>
 
-      <div className="mt-7 overflow-hidden rounded-panel border border-line bg-surface">
+      <div className="card-rise mt-7 overflow-hidden rounded-panel border border-line bg-surface">
         <ul className="-me-px -mb-px grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
           {providers.map((provider) => (
             <li key={provider.slug} className="border-e border-b border-line-2">

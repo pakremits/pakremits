@@ -62,7 +62,7 @@ export async function TodaysExample({
   return (
     <section id="example" aria-labelledby="example-title" className="mt-16">
       <div
-        className="grid overflow-hidden rounded-panel-lg bg-surface
+        className="card-rise grid overflow-hidden rounded-panel-lg bg-surface
                    lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]"
       >
         <div className="border-b border-line-2 p-7 sm:p-9 lg:border-b-0">

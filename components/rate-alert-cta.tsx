@@ -30,7 +30,7 @@ export function RateAlertCta({
   return (
     <section
       aria-labelledby="rate-alert-cta-title"
-      className={`rounded-[20px] bg-surface px-6 py-7 sm:px-10 sm:py-9 ${
+      className={`card-rise rounded-[20px] bg-surface px-6 py-7 sm:px-10 sm:py-9 ${
         aside
           ? 'grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-center lg:gap-12'
           : 'flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10'

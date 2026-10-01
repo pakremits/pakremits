@@ -203,6 +203,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             corridors={corridorOptions}
             initialCorridor={EXAMPLE_CORRIDOR.slug}
             initialAmount={EXAMPLE_AMOUNT}
+            locateVisitor
           />
         </div>
       </CorridorHero>
@@ -257,10 +258,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 body: t('trustPayoutBody'),
                 path: 'M3 9h18L12 4 3 9Zm2 2v6m4-6v6m6-6v6m4-6v6M3 20h18',
               },
-            ].map((card) => (
+            ].map((card, index) => (
               <li
                 key={card.title}
-                className="flex min-h-60 flex-col rounded-[10px] bg-surface p-6"
+                className="card-rise flex min-h-60 flex-col rounded-[10px] bg-surface p-6"
+                style={{ '--i': index } as React.CSSProperties}
               >
                 <div className="grid h-10 w-10 place-items-center rounded-[11px] bg-icon-bg text-leaf">
                   <svg
@@ -329,8 +331,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 body: t('cardBonusBody'),
                 path: 'M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7z',
               },
-            ].map((card) => (
-              <div key={card.title} className="rounded-panel bg-surface p-7">
+            ].map((card, index) => (
+              <div
+                key={card.title}
+                className="card-rise rounded-panel bg-surface p-7"
+                style={{ '--i': index } as React.CSSProperties}
+              >
                 <div className="mb-4.5 grid h-11 w-11 place-items-center rounded-[12px] bg-icon-bg text-leaf">
                   <svg
                     viewBox="0 0 24 24"
@@ -370,17 +376,18 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </div>
 
             <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {chips.map((chip) => (
+              {chips.map((chip, index) => (
                 <Link
                   key={chip.slug}
                   href={corridorPath(chip.slug, locale)}
+                  style={{ '--i': index % 4 } as React.CSSProperties}
                   // isolate: the watermark's z-index stays inside the card.
-                  className="flag-host group/cc relative isolate flex min-h-[148px] flex-col overflow-hidden rounded-[14px]
+                  className="card-rise card-lift flag-host group/cc relative isolate flex min-h-[148px] flex-col overflow-hidden rounded-[14px]
                              bg-surface p-5 text-ink no-underline focus-visible:outline-none dark:bg-header
                              focus-visible:ring-[3px] focus-visible:ring-accent"
                 >
-                  {/* The flag watermark, cropped into the top corner and faded
-                      towards the name. */}
+                  {/* The flag watermark, cropped into the bottom corner, softly
+                      blurred and faded towards the name. */}
                   <span className="flag-mark flag-mark--corner" aria-hidden="true">
                     <CountryFlag
                       countryCode={COUNTRY_BY_CURRENCY.get(chip.currency as SendCurrency) ?? 'EU'}

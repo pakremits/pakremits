@@ -1,6 +1,6 @@
 /**
- * Delivery-method pages, reached via rewrites from /send-money-to-[slug] and
- * /roshan-digital-account-transfer.
+ * Delivery-method pages, reached via rewrites from /compare/[slug]-transfers
+ * and /compare/roshan-digital-account-transfers.
  *
  * The comparison panel is pre-set to the relevant choice. RDA keeps its label
  * while using general bank-deposit quotes, with a qualification in the panel.

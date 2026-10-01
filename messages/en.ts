@@ -231,7 +231,7 @@ export const en = {
   panel: {
     heading: 'Compare money transfer services',
     sendingFrom: 'Sending from',
-    recipientGets: 'Recipient gets it in',
+    recipientGets: 'Recipient gets',
     youSend: 'You send',
     compareButton: 'Compare rates',
     resultsHeading: 'Available rates',
@@ -344,6 +344,7 @@ export const en = {
   },
 
   common: {
+    loadingSite: 'Loading PakRemits',
     breadcrumb: 'Breadcrumb',
     otherCorridors: 'Other corridors',
     lastReviewed: 'Guidance on this page was last reviewed on {date}.',
