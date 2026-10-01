@@ -164,11 +164,21 @@ jobs:
           [ "$commit" = "$GITHUB_SHA" ] \
             || { echo "::error::/api/health reports '${commit:-nothing}', expected $GITHUB_SHA"; exit 1; }
 
-          for path in / /ur /compare /compare/uk-to-pakistan /gbp-to-pkr /providers /how-we-rank /sitemap.xml; do
+          for path in / /compare /compare/uk-to-pakistan /gbp-to-pkr /providers /how-we-rank /sitemap.xml; do
             code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 --retry 2 --retry-delay 5 "$SITE_URL$path" || true)"
             echo "$code $path"
             [ "$code" = 200 ] || { echo "::error::GET $path returned $code"; exit 1; }
           done
+
+          # Urdu is switched off for now (ENABLED_LOCALES in i18n/routing.ts):
+          # /ur must send a temporary redirect to the English home page. When
+          # Urdu comes back, put /ur back in the 200 list above instead.
+          urdu="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 --retry 2 --retry-delay 5 "$SITE_URL/ur" || true)"
+          echo "$urdu /ur"
+          case "$urdu" in
+            "307 $SITE_URL/" | "302 $SITE_URL/") ;;
+            *) echo "::error::GET /ur returned '$urdu', expected a temporary redirect to /"; exit 1 ;;
+          esac
 
           # The pre-/compare corridor URLs are in search indexes and old links,
           # so they must keep redirecting permanently to the new address.
