@@ -18,6 +18,7 @@ import { SEND_CURRENCIES, type SendCurrency } from '@/lib/db/schema'
 import { formatPkr, round } from '@/lib/ranking/compute'
 import { getComparison, getMidMarketHistory, getMidMarketSeries } from '@/lib/quotes'
 import { RateBackdrop } from '@/components/rate-backdrop'
+import { RateRangeProvider } from '@/components/rate-range'
 import { corridorPath } from '@/lib/routes'
 import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
@@ -75,9 +76,6 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
     getMidMarketHistory(currency, 90),
     getComparison({ corridorSlug: corridor.slug, method: 'bank' }),
   ])
-  // The banner's gold line: the last 30 days.
-  const backdropFrom = (history.daily.at(-1)?.t ?? 0) - 30 * 24 * 60 * 60 * 1000
-  const backdropPoints = history.daily.filter((point) => point.t >= backdropFrom)
 
   const latest = series90.latest
   const best = comparison?.rows.find((r) => r.isBest)
@@ -120,12 +118,15 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
     <>
       <SiteHeader locale={locale} />
 
+      {/* The banner line and the chart share one range: pick 1W on the chart
+          and the banner redraws the last week. */}
+      <RateRangeProvider initial="all">
       <main>
         {/* The home banner's gradient, with the last month's rate drawn in gold
             along its foot. Taller than the text needs, to give the line room. */}
         <div className="hero-gradient relative overflow-hidden px-0 pt-12 pb-44 text-white sm:pt-14 sm:pb-52">
           <RateBackdrop
-            points={backdropPoints}
+            history={history}
             className="absolute inset-x-0 bottom-0 h-[170px] w-full sm:h-[230px]"
           />
           <div className="relative mx-auto max-w-[1120px] px-6">
@@ -279,6 +280,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
           </section>
         </div>
       </main>
+      </RateRangeProvider>
 
       <SiteFooter locale={locale} />
 

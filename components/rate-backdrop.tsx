@@ -1,17 +1,36 @@
+'use client'
+
 import { useId } from 'react'
-import type { RatePoint } from '@/lib/quotes'
+import type { RateHistory } from '@/lib/quotes'
+import { pointsFor, resolveRange, type RangeKey } from '@/lib/rate-ranges'
+import { useSharedRateRange } from '@/components/rate-range'
 
 /**
- * The rate page banner's backdrop: the recent rate as a gold line with a gold
+ * The rate page banner's backdrop: the rate as a gold line with a soft gold
  * wash beneath it, running the full width of the banner behind the numbers.
  *
- * Decorative (the interactive chart below the banner is the readable one), so
- * it is hidden from assistive tech. Server-rendered SVG: no JavaScript.
- * `preserveAspectRatio="none"` stretches it to the banner at any width; the
- * stroke keeps its thickness through `vector-effect`.
+ * Follows the range picked on the chart below (through RateRangeProvider), so
+ * the banner and the chart always show the same window; the line fades in
+ * again when it changes.
+ *
+ * Decorative (the chart below is the readable one), so it is hidden from
+ * assistive tech. `preserveAspectRatio="none"` stretches it to the banner at
+ * any width; the stroke keeps its thickness through `vector-effect`.
  */
-export function RateBackdrop({ points, className = '' }: { points: RatePoint[]; className?: string }) {
+export function RateBackdrop({
+  history,
+  fallbackRange = 'all',
+  className = '',
+}: {
+  history: RateHistory
+  /** Used outside a RateRangeProvider. */
+  fallbackRange?: RangeKey
+  className?: string
+}) {
   const gradientId = useId()
+  const shared = useSharedRateRange()
+  const range = resolveRange(history, shared?.range ?? fallbackRange)
+  const points = range ? pointsFor(history, range) : []
   if (points.length < 2) return null
 
   const width = 1000
@@ -33,9 +52,11 @@ export function RateBackdrop({ points, className = '' }: { points: RatePoint[]; 
 
   return (
     <svg
+      // Keyed on the range, so a change remounts it and the fade-in replays.
+      key={range}
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
-      className={`pointer-events-none ${className}`}
+      className={`rate-backdrop pointer-events-none ${className}`}
       aria-hidden="true"
     >
       <defs>

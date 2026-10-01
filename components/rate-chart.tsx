@@ -1,7 +1,9 @@
 'use client'
 
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
-import type { RateHistory, RatePoint } from '@/lib/quotes'
+import type { RateHistory } from '@/lib/quotes'
+import { RANGES, type RangeKey, pointsFor, rangeAvailable, resolveRange } from '@/lib/rate-ranges'
+import { useSharedRateRange } from '@/components/rate-range'
 
 /**
  * Mid-market rate chart with range controls (24 hours, week, month, all) and
@@ -13,19 +15,10 @@ import type { RateHistory, RatePoint } from '@/lib/quotes'
  * and low are printed on their guide lines.
  *
  * A range only appears when there is data for it: the 24-hour view needs
- * intraday captures, and "All" only when it reaches further back than a month.
+ * intraday captures, and "All" only when it reaches further back than a month
+ * (lib/rate-ranges.ts). Inside a RateRangeProvider the range is shared, so the
+ * rate page's banner line follows it.
  */
-
-type RangeKey = '24h' | '1w' | '1m' | 'all'
-
-const DAY_MS = 24 * 60 * 60 * 1000
-
-const RANGES: { key: RangeKey; label: string; long: string; days?: number }[] = [
-  { key: '24h', label: '24h', long: 'last 24 hours' },
-  { key: '1w', label: '1W', long: 'last 7 days', days: 7 },
-  { key: '1m', label: '1M', long: 'last 30 days', days: 30 },
-  { key: 'all', label: 'All', long: 'all history' },
-]
 
 const DAY_FMT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'Asia/Karachi' })
 const TIME_FMT = new Intl.DateTimeFormat('en-GB', {
@@ -33,25 +26,6 @@ const TIME_FMT = new Intl.DateTimeFormat('en-GB', {
   minute: '2-digit',
   timeZone: 'Asia/Karachi',
 })
-
-function pointsFor(history: RateHistory, range: RangeKey): RatePoint[] {
-  if (range === '24h') return history.intraday
-  const daily = history.daily
-  const spec = RANGES.find((r) => r.key === range)
-  if (!spec?.days || daily.length === 0) return daily
-  const cutoff = daily[daily.length - 1].t - spec.days * DAY_MS
-  return daily.filter((point) => point.t >= cutoff)
-}
-
-function available(history: RateHistory, range: RangeKey): boolean {
-  if (range === '24h') return history.intraday.length >= 2
-  const daily = history.daily
-  if (daily.length < 2) return false
-  const covered = daily[daily.length - 1].t - daily[0].t
-  // "All" is only worth a tab when it shows more than the month view does.
-  if (range === 'all') return covered > 31 * DAY_MS
-  return pointsFor(history, range).length >= 2
-}
 
 export function RateChart({
   history,
@@ -70,9 +44,12 @@ export function RateChart({
   /** Drop the panel frame, for a chart that sits inside another panel. */
   bare?: boolean
 }) {
-  const ranges = RANGES.filter((range) => available(history, range.key))
-  const initial = ranges.find((range) => range.key === defaultRange) ?? ranges.at(-1)
-  const [range, setRange] = useState<RangeKey | undefined>(initial?.key)
+  const ranges = RANGES.filter((range) => rangeAvailable(history, range.key))
+  // On the rate page the range is shared with the banner line; elsewhere it is local.
+  const shared = useSharedRateRange()
+  const [localRange, setLocalRange] = useState<RangeKey | undefined>(() => resolveRange(history, defaultRange))
+  const range = shared ? resolveRange(history, shared.range) : localRange
+  const setRange = shared ? shared.setRange : setLocalRange
   const [active, setActive] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const gradientId = useId()

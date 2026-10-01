@@ -294,6 +294,22 @@ html.theme-fade *::after {
   }
 }
 
+/* The rate page banner line fades in again when the chart's range changes
+   (it is keyed on the range, so each change mounts it fresh). */
+.rate-backdrop {
+  animation: rate-backdrop-in 0.5s ease-out both;
+}
+@keyframes rate-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rate-backdrop {
+    animation: none;
+  }
+}
+
 /* Scroll lock for every overlay. A modal <dialog> blocks clicks on the page
    but not scrolling, and locking <body> alone is not enough on iOS Safari —
    the lock has to be on <html>. Native dialogs (rate alert, compare sheet)
