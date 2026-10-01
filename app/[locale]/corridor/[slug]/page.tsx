@@ -89,7 +89,7 @@ export default async function CorridorPage({ params }: { params: Promise<{ local
 
   const [comparison, history] = await Promise.all([
     getComparison({ corridorSlug: slug, method: 'bank' }),
-    getMidMarketHistory(corridor.fromCurrency, 90),
+    getMidMarketHistory(corridor.fromCurrency, 365),
   ])
 
   const corridorOptions = CORRIDORS.map((c) => ({

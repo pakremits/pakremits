@@ -73,7 +73,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
 
   const [series90, history, comparison] = await Promise.all([
     getMidMarketSeries(currency, 90),
-    getMidMarketHistory(currency, 90),
+    getMidMarketHistory(currency, 365),
     getComparison({ corridorSlug: corridor.slug, method: 'bank' }),
   ])
 

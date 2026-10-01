@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { RateHistory } from '@/lib/quotes'
-import { RANGES, type RangeKey, pointsFor, rangeAvailable, resolveRange } from '@/lib/rate-ranges'
+import { ALWAYS_LISTED, RANGES, type RangeKey, pointsFor, rangeAvailable, resolveRange } from '@/lib/rate-ranges'
 import { useSharedRateRange } from '@/components/rate-range'
 
 /**
@@ -44,7 +44,9 @@ export function RateChart({
   /** Drop the panel frame, for a chart that sits inside another panel. */
   bare?: boolean
 }) {
-  const ranges = RANGES.filter((range) => rangeAvailable(history, range.key))
+  // 24h and All appear only with data behind them; 1W, 1M and 3M always
+  // show, greyed out until the history covers them.
+  const ranges = RANGES.filter((range) => rangeAvailable(history, range.key) || ALWAYS_LISTED.includes(range.key))
   // On the rate page the range is shared with the banner line; elsewhere it is local.
   const shared = useSharedRateRange()
   const [localRange, setLocalRange] = useState<RangeKey | undefined>(() => resolveRange(history, defaultRange))
@@ -158,25 +160,31 @@ export function RateChart({
         // Same segmented control as the results' sort tabs: the grey backing
         // shows through the 3px gaps as dividers.
         <div role="group" aria-label="Chart range" className="mt-4 flex w-fit gap-[3px] overflow-hidden rounded-[10px] bg-line">
-          {ranges.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={option.key === range}
-              onClick={() => {
-                setRange(option.key)
-                setActive(null)
-              }}
-              className={`cursor-pointer px-5 py-2.5 text-[15px] font-bold whitespace-nowrap transition-colors ${
-                option.key === range
-                  ? 'bg-brand text-white'
-                  : // The page's grey, so the tabs stand out on the white chart panel.
-                    'bg-mist text-ink-2 hover:bg-tint hover:text-tint-ink'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
+          {ranges.map((option) => {
+            const enabled = rangeAvailable(history, option.key)
+            return (
+              <button
+                key={option.key}
+                type="button"
+                aria-pressed={option.key === range}
+                disabled={!enabled}
+                title={enabled ? undefined : `Needs more rate history to show the ${option.long}`}
+                onClick={() => {
+                  setRange(option.key)
+                  setActive(null)
+                }}
+                className={`cursor-pointer px-5 py-2.5 text-[15px] font-bold whitespace-nowrap transition-colors
+                            disabled:cursor-not-allowed disabled:text-faint disabled:opacity-60 ${
+                  option.key === range
+                    ? 'bg-brand text-white'
+                    : // The page's grey, so the tabs stand out on the white chart panel.
+                      'bg-mist text-ink-2 enabled:hover:bg-tint enabled:hover:text-tint-ink'
+                }`}
+              >
+                {option.label}
+              </button>
+            )
+          })}
         </div>
       )}
 

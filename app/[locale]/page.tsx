@@ -112,7 +112,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     getComparison({ corridorSlug: EXAMPLE_CORRIDOR.slug, amount: EXAMPLE_AMOUNT }),
     getProofStats(),
     listRosterProviders(),
-    getMidMarketHistory(EXAMPLE_CORRIDOR.fromCurrency, 90),
+    getMidMarketHistory(EXAMPLE_CORRIDOR.fromCurrency, 365),
   ])
 
   const exampleSendLabel = formatSend(CURRENCY_SYMBOLS[EXAMPLE_CORRIDOR.fromCurrency], EXAMPLE_AMOUNT)
