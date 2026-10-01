@@ -1,36 +1,10 @@
-.overlay {
+/* The header logo's first-load build-up (components/animated-logo.tsx). */
+.logo {
+  /* Same green and gold as public/pakrimits-new-logo.svg, in both themes. */
   --pr-green: #14936f;
   --pr-gold: #e0a513;
-  --pr-splash-bg: var(--color-surface);
-
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: grid;
-  place-items: center;
-  background: var(--pr-splash-bg);
-  transition: opacity 0.45s ease, visibility 0.45s ease;
-}
-
-/* The background follows --color-surface; only the logo green needs a
-   lighter dark-theme value. */
-:global(html[data-theme='dark']) .overlay {
-  --pr-green: #2fb388;
-}
-
-/* SPLASH_SCRIPT marks <html> before paint on repeat loads, so it never flashes. */
-:global(html[data-splash-seen]) .overlay {
-  display: none;
-}
-
-.exit {
-  opacity: 0;
-  visibility: hidden;
-}
-
-.logo {
-  width: min(78vw, 420px);
-  height: auto;
+  display: block;
+  /* The arrow's streaks start just left of the R. */
   overflow: visible;
 }
 
@@ -111,4 +85,29 @@
   .streak { animation: none; opacity: 0; }
   .r { animation: none; fill-opacity: 1; stroke-opacity: 0; }
   .arrow, .ch, .dot { animation: none; opacity: 1; transform: none; }
+}
+
+/* Page loaded and build-up done: the arrow stops "sending". */
+.settled .arrow {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+/* Later mounts (client navigation) and the drawer copy: the finished logo. */
+.still .streak {
+  animation: none;
+  opacity: 0;
+}
+.still .r {
+  animation: none;
+  fill-opacity: 1;
+  stroke-opacity: 0;
+}
+.still .arrow,
+.still .ch,
+.still .dot {
+  animation: none;
+  opacity: 1;
+  transform: none;
 }

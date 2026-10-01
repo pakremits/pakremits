@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { NextIntlClientProvider } from 'next-intl'
-import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { setRequestLocale } from 'next-intl/server'
 import { GoogleTagManager } from '@next/third-parties/google'
 import { fonts } from '@/lib/fonts'
 import { ENABLED_LOCALES, LOCALE_DIR, LOCALE_TAG, isLocale } from '@/i18n/routing'
@@ -11,8 +11,6 @@ import { NavigationScrollReset } from '@/components/navigation-scroll-reset'
 import { RateAlertDialog } from '@/components/rate-alert-dialog'
 import { ScrollReveal } from '@/components/scroll-reveal'
 import { THEME_SCRIPT } from '@/lib/theme'
-import { SPLASH_SCRIPT } from '@/lib/splash'
-import { PakLoader } from '@/components/pak-loader'
 import { InlineScript } from '@/components/inline-script'
 import { CORRIDORS } from '@/lib/corridors'
 import { latestMidMarket } from '@/lib/quotes'
@@ -60,7 +58,6 @@ export default async function LocaleLayout({
   setRequestLocale(locale)
 
   const all = await getMessages(locale)
-  const tCommon = await getTranslations({ locale, namespace: 'common' })
 
   // Rate alert dialog data. latestMidMarket degrades to null on a database
   // outage, so the dialog still opens with the pairs listed.
@@ -118,9 +115,6 @@ export default async function LocaleLayout({
         {/* First in <body> and blocking on purpose: it must set the theme
             before anything paints. */}
         <InlineScript html={THEME_SCRIPT} />
-        {/* Before the loader, so a repeat load hides it before it paints. */}
-        <InlineScript html={SPLASH_SCRIPT} />
-        <PakLoader label={tCommon('loadingSite')} />
         {gtmId && (
           <noscript>
             <iframe

@@ -1,25 +1,23 @@
 'use client'
 
 import { useEffect, useState, type CSSProperties } from 'react'
-import { SPLASH_CAP_MS, SPLASH_SEEN_KEY } from '@/lib/splash'
-import styles from './pak-loader.module.css'
+import styles from './animated-logo.module.css'
 
 /**
- * The PakRemits logo building itself while the first page loads.
+ * The header logo, building itself on the first page load: the R draws its
+ * outline and fills, the arrow shoots through it, the letters rise and the
+ * gold dots drop onto the i's. While the page is still loading the arrow keeps
+ * "sending"; once the window has loaded it settles.
  *
- * Server-rendered, so it covers the page from the first paint, then fades out
- * once the build-up has played and the window has loaded (at most MAX_MS).
- * Only on a direct visit, once per tab session: SPLASH_SCRIPT marks <html>
- * before paint on a repeat load, an arrival from another site (a search
- * result) or a crawler, and the CSS hides the overlay. The same script also
- * enforces the cap from first paint, so slow hydration cannot extend it. Client navigations keep the layout
- * mounted, so they never replay it.
+ * Nothing covers the page — the logo animates in place and everything else is
+ * usable from first paint. The animation is pure CSS, so it starts with the
+ * server-rendered HTML, before hydration.
+ *
+ * Plays once per full page load. The header remounts on every client
+ * navigation, so a module-level flag marks it played and later mounts render
+ * the finished logo. `still` does the same for copies that should never play
+ * (the menu drawer's). Reduced motion gets the finished logo (CSS).
  */
-
-const MIN_MS = 2200 // let the build-up finish before leaving
-const REDUCED_MIN_MS = 600 // no build-up to wait for, just the logo
-const MAX_MS = SPLASH_CAP_MS // never block the page longer than this
-const EXIT_MS = 450 // must match the .exit transition in the CSS
 
 // Paths traced from the pakrimits logo (viewBox 0 0 480 96).
 const M = 'matrix(0.0125 0 0 -0.0125 0 96)'
@@ -39,81 +37,65 @@ const LETTERS = [
 const ARROW = 'M4483 5216 c-10 -13 -26 -38 -35 -55 -32 -58 28 -56 -1295 -61 -1123\n-5 -1224 -6 -1239 -22 -29 -28 -8 -64 107 -184 166 -173 166 -177 3 -344 -118\n-122 -139 -159 -110 -188 15 -16 116 -17 1239 -22 1378 -6 1262 2 1310 -88 32\n-58 60 -67 107 -35 53 37 468 393 493 423 54 64 51 70 -226 338 -270 260 -314\n290 -354 238z'
 const DOTS = ['M24113 7658 c-7 -15 -47 -41 -108 -72 -276 -138 -411 -433 -345 -755\n42 -207 139 -340 332 -452 298 -174 732 -74 922 212 136 206 151 491 36 719\n-60 118 -170 221 -309 288 -45 22 -77 45 -84 59 -10 23 -10 23 -222 23 -210 0\n-212 0 -222 -22z', 'M31495 7658 c-6 -14 -43 -40 -95 -66 -233 -118 -351 -297 -366 -557\n-12 -199 27 -332 143 -483 274 -358 835 -346 1099 23 77 109 113 198 123 305\n30 330 -85 564 -349 705 -58 30 -99 59 -105 73 -10 22 -11 22 -225 22 -214 0\n-215 0 -225 -22z']
 
-type Phase = 'show' | 'exit' | 'gone'
+/** Set once the bar's logo has played, so client navigations do not replay it. */
+let played = false
 
-export function PakLoader({ label }: { label: string }) {
-  const [phase, setPhase] = useState<Phase>('show')
+/** Matches the end of the build-up in the CSS: the last dot lands around 2.2s. */
+const BUILD_MS = 2200
+
+export function AnimatedLogo({ className = '', still = false }: { className?: string; still?: boolean }) {
+  // Same value on the server and in the first client render (played starts
+  // false), so hydration matches; later mounts read true.
+  const [animate] = useState(() => !still && !played)
+  const [settled, setSettled] = useState(!animate)
 
   useEffect(() => {
-    // Already seen this session: the CSS keeps it hidden, nothing to time.
-    if (document.documentElement.hasAttribute(SPLASH_SEEN_KEY)) return
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
-    const minMs = reduced ? REDUCED_MIN_MS : MIN_MS
-    const timers: number[] = []
-    let finished = false
-    const finish = () => {
-      if (finished) return
-      finished = true
-      const wait = Math.max(0, minMs - performance.now())
-      timers.push(
-        window.setTimeout(() => {
-          setPhase('exit')
-          try {
-            sessionStorage.setItem(SPLASH_SEEN_KEY, '1')
-          } catch {
-            // Blocked storage: it just plays again on the next full load.
-          }
-          timers.push(window.setTimeout(() => setPhase('gone'), EXIT_MS))
-        }, wait),
-      )
+    if (!animate) return
+    played = true
+    // Settle the arrow once the page has loaded and the build-up has finished.
+    let timer = 0
+    const settle = () => {
+      timer = window.setTimeout(() => setSettled(true), Math.max(0, BUILD_MS - performance.now()))
     }
-    if (document.readyState === 'complete') finish()
-    else window.addEventListener('load', finish, { once: true })
-    timers.push(window.setTimeout(finish, MAX_MS))
+    if (document.readyState === 'complete') settle()
+    else window.addEventListener('load', settle, { once: true })
     return () => {
-      timers.forEach(clearTimeout)
-      window.removeEventListener('load', finish)
+      window.removeEventListener('load', settle)
+      window.clearTimeout(timer)
     }
-  }, [])
+  }, [animate])
 
-  if (phase === 'gone') return null
+  const state = !animate ? styles.still : settled ? styles.settled : ''
 
   return (
-    <div
-      data-pak-loader=""
-      className={`${styles.overlay} ${phase === 'exit' ? styles.exit : ''}`}
-      role="status"
-      aria-live="polite"
-      aria-label={label}
+    <svg
+      className={`${styles.logo} ${state} ${className}`}
+      viewBox="0 0 480 96"
+      role="img"
+      aria-label="PakRemits"
     >
-      {/* Without JavaScript nothing would ever take it down. */}
-      <noscript>
-        <style>{'[data-pak-loader]{display:none}'}</style>
-      </noscript>
-      <svg className={styles.logo} viewBox="0 0 480 96" aria-hidden="true">
-        <line className={styles.streak} x1="-22" y1="33" x2="-2" y2="33" />
-        <line className={styles.streak} x1="-30" y1="40" x2="-6" y2="40" style={{ animationDelay: '0.84s' }} />
+      <line className={styles.streak} x1="-22" y1="33" x2="-2" y2="33" />
+      <line className={styles.streak} x1="-30" y1="40" x2="-6" y2="40" style={{ animationDelay: '0.84s' }} />
 
-        {R_PARTS.map((d, i) => (
-          <path key={i} className={styles.r} transform={M} d={d} pathLength={1} />
-        ))}
+      {R_PARTS.map((d, i) => (
+        <path key={i} className={styles.r} transform={M} d={d} pathLength={1} />
+      ))}
 
-        <g className={styles.arrow}>
-          <path transform={M} d={ARROW} />
+      <g className={styles.arrow}>
+        <path transform={M} d={ARROW} />
+      </g>
+
+      {LETTERS.map((d, i) => (
+        <g key={i} className={styles.ch} style={{ '--i': i } as CSSProperties}>
+          <path transform={M} d={d} />
         </g>
+      ))}
 
-        {LETTERS.map((d, i) => (
-          <g key={i} className={styles.ch} style={{ '--i': i } as CSSProperties}>
-            <path transform={M} d={d} />
-          </g>
-        ))}
-
-        {DOTS.map((d, i) => (
-          <g key={i} className={styles.dot} style={{ '--d': i } as CSSProperties}>
-            <path transform={M} d={d} />
-          </g>
-        ))}
-      </svg>
-    </div>
+      {DOTS.map((d, i) => (
+        <g key={i} className={styles.dot} style={{ '--d': i } as CSSProperties}>
+          <path transform={M} d={d} />
+        </g>
+      ))}
+    </svg>
   )
 }

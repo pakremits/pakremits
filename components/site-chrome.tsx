@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
+import { AnimatedLogo } from '@/components/animated-logo'
 import { MobileNav } from '@/components/mobile-nav'
 import { ScrollTopLink } from '@/components/scroll-top-link'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -76,24 +77,12 @@ export async function SiteHeader({
   const drawerIcon = (key: DrawerKey) =>
     key in NAV_ICONS ? NAV_ICONS[key as NavKey] : DRAWER_ICONS[key as keyof typeof DRAWER_ICONS]
 
-  const logo = (
-    <>
-      {/* The brand-sheet logo, teal and gold, in both themes: the teal still
-          reads on the dark bar. See public/pakrimits-new-logo.svg.
-
-          Plain <img>, not next/image: the source is a static SVG, which the
-          image optimiser passes through untouched anyway and only serves
-          behind `dangerouslyAllowSVG`. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/pakrimits-new-logo.svg"
-        alt="PakRemits"
-        width={185}
-        height={36}
-        className="h-6 w-auto sm:h-9 lg:h-7 xl:h-9"
-      />
-    </>
-  )
+  /* The brand-sheet logo, teal and gold, in both themes: the teal still reads
+     on the dark bar. Inline SVG so it can build itself on the first page load
+     (components/animated-logo.tsx). The drawer's copy is always still. */
+  const logoSize = 'aspect-[5/1] h-6 w-auto sm:h-9 lg:h-7 xl:h-9'
+  const logo = <AnimatedLogo className={logoSize} />
+  const drawerLogo = <AnimatedLogo className={logoSize} still />
 
   const alertHref = `${localePath(locale, '/')}#alerts`
 
@@ -188,7 +177,7 @@ export async function SiteHeader({
             closeLabel={t('closeMenu')}
             brand={
               <Link href={localePath(locale, '/')} className="flex items-center no-underline">
-                {logo}
+                {drawerLogo}
               </Link>
             }
             cta={{ href: alertHref, label: t('setAlert') }}

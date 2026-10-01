@@ -345,7 +345,6 @@ export const en = {
   },
 
   common: {
-    loadingSite: 'Loading PakRemits',
     breadcrumb: 'Breadcrumb',
     otherCorridors: 'Other corridors',
     lastReviewed: 'Guidance on this page was last reviewed on {date}.',
