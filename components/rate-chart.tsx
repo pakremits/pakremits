@@ -155,7 +155,9 @@ export function RateChart({
       </figcaption>
 
       {ranges.length > 1 && (
-        <div role="group" aria-label="Chart range" className="mt-4 flex w-fit gap-[3px] rounded-[10px] bg-line p-[3px]">
+        // Same segmented control as the results' sort tabs: the grey backing
+        // shows through the 3px gaps as dividers.
+        <div role="group" aria-label="Chart range" className="mt-4 flex w-fit gap-[3px] overflow-hidden rounded-[10px] bg-line">
           {ranges.map((option) => (
             <button
               key={option.key}
@@ -165,8 +167,10 @@ export function RateChart({
                 setRange(option.key)
                 setActive(null)
               }}
-              className={`cursor-pointer rounded-[8px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
-                option.key === range ? 'bg-brand text-white' : 'bg-surface text-ink-2 hover:text-ink'
+              className={`cursor-pointer px-5 py-2.5 text-[15px] font-bold whitespace-nowrap transition-colors ${
+                option.key === range
+                  ? 'bg-brand text-white'
+                  : 'bg-surface text-ink-2 hover:bg-tint hover:text-tint-ink'
               }`}
             >
               {option.label}
