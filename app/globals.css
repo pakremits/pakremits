@@ -375,9 +375,9 @@ dialog {
   animation-play-state: paused;
 }
 
-/* Each tile's flag watermark: in its own colours but faint, tilted like a
+/* A flag watermark: in its own colours but faint, tilted like a
    stamp, and faded out towards the text so the rate stays legible. Hover
-   brings it forward. The fade runs towards the tile's end, so it flips for Urdu. */
+   brings it forward. The fade runs towards the host's end, so it flips for Urdu. */
 .flag-mark {
   position: absolute;
   z-index: -1;
@@ -403,7 +403,7 @@ dialog {
 
 /* On a taller card: a piece in the bottom corner, the empty space beside
    the rate, so the country name above stays clear. A little fainter than the
-   ticker's, since a card shows more of it. */
+   base, since a card shows more of it. */
 .flag-mark.flag-mark--corner {
   inset-block: auto -24%;
   inset-inline-end: -10%;
