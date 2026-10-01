@@ -160,7 +160,7 @@ export function CompareSheet({
               ids={SHEET_IDS}
               onPendingChange={onPendingChange}
               bare
-              className="border-t-[3px] border-line sm:mt-2"
+              className="sm:mt-2"
             />
           </div>
         )}

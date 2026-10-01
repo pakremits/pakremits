@@ -50,18 +50,9 @@ export async function RateMarquee({
         key={`${duplicate ? 'dup-' : ''}${item.slug}`}
         href={corridorPath(item.slug, locale)}
         tabIndex={duplicate ? -1 : undefined}
-        // isolate: the watermark's z-index stays inside the tile, behind its text.
-        className="flag-host group/mq relative isolate flex items-center gap-2.5 overflow-hidden px-4 py-3.5
-                   whitespace-nowrap text-ink no-underline transition-colors sm:gap-3.5 sm:px-7 sm:py-6
-                   hover:text-tint-ink"
+        className="group/mq flex items-center gap-2.5 px-4 py-3.5 whitespace-nowrap text-ink
+                   no-underline transition-colors sm:gap-3.5 sm:px-7 sm:py-6 hover:text-tint-ink"
       >
-        {/* The tile's flag, large and faint, cropped by the tile's far edge. Its
-            hard edge is what separates one tile from the next, and it comes
-            forward on hover. Styles in globals.css. */}
-        <span className="flag-mark" aria-hidden="true">
-          <CountryFlag countryCode={item.countryCode} />
-        </span>
-
         <span className="flex h-7 w-8 flex-none items-center justify-center rounded-[7px] bg-line-2 sm:h-8.5 sm:w-10 sm:rounded-[8px] [&_svg]:max-sm:h-3.5 [&_svg]:max-sm:w-5">
           <CountryFlag countryCode={item.countryCode} />
         </span>
@@ -135,7 +126,7 @@ export async function RateMarquee({
         <span className="hidden sm:inline">{t('marqueeHint')}</span>
       </div>
 
-      <div className="marquee-viewport relative overflow-hidden border-y-[3px] border-line bg-surface">
+      <div className="marquee-viewport relative overflow-hidden bg-surface">
         <div className="marquee-track flex w-max">
           {items.map((item) => row(item, { duplicate: false }))}
           <span className="marquee-dup contents" aria-hidden="true">

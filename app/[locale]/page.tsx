@@ -379,8 +379,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                              bg-surface p-5 text-ink no-underline focus-visible:outline-none dark:bg-header
                              focus-visible:ring-[3px] focus-visible:ring-accent"
                 >
-                  {/* The same flag watermark as the rate ticker, cropped into the
-                      top corner and faded towards the name. */}
+                  {/* The flag watermark, cropped into the top corner and faded
+                      towards the name. */}
                   <span className="flag-mark flag-mark--corner" aria-hidden="true">
                     <CountryFlag
                       countryCode={COUNTRY_BY_CURRENCY.get(chip.currency as SendCurrency) ?? 'EU'}

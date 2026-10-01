@@ -240,12 +240,13 @@ export function CompareSearch({
   const label = row ? labelClass.replace('mb-3', 'mb-2') : labelClass
 
   /** Fixed values: the currency follows the country, and the recipient
-   *  always gets PKR, so neither needs a dropdown of values. */
-  const staticValue = (text: string, labelText: string) => (
+   *  always gets PKR, so neither needs a dropdown of values. `flush` drops
+   *  the side padding for a value in no box, so it lines up with its label. */
+  const staticValue = (text: string, labelText: string, flush = false) => (
     <span
       className={`flex h-full items-center font-semibold text-ink ${
-        row ? 'px-4 text-[18px]' : 'px-4 text-[18px] sm:px-5 sm:text-[20px]'
-      }`}
+        row ? 'text-[18px]' : 'text-[18px] sm:text-[20px]'
+      } ${flush ? '' : row ? 'px-4' : 'px-4 sm:px-5'}`}
       aria-label={labelText}
     >
       {text}
@@ -271,7 +272,7 @@ export function CompareSearch({
         />
         {/* Wide enough for the switch's arrow in every corridor, so the field
             does not change size when the country does. */}
-        <div className={`${row ? 'w-[100px]' : 'w-[104px] sm:w-[116px]'} shrink-0 border-s-[3px] border-line`}>
+        <div className={`${row ? 'w-[100px]' : 'w-[104px] sm:w-[116px]'} shrink-0`}>
           {currencySymbol ? (
             <IconSelect
               id={`${ids.amount}-currency`}
@@ -297,11 +298,7 @@ export function CompareSearch({
   const receiveField = (
     <div className="min-w-0">
       <span className={label}>{t('to')}</span>
-      {/* Hugs its text, so the padding reads the same on both sides and the
-          box does not look like an empty field waiting for a number. */}
-      <div className={`${fieldHeight} w-fit rounded-[8px] border-[3px] border-line`}>
-        {staticValue('PKR', t('receiveCurrency'))}
-      </div>
+      <div className={fieldHeight}>{staticValue('PKR', t('receiveCurrency'), true)}</div>
     </div>
   )
 
@@ -349,7 +346,7 @@ export function CompareSearch({
   if (row) {
     /*
       Below lg the bar has no room for one row, so it takes the hero card's
-      shape instead: country and payout as ruled sections, then amount and
+      shape instead: country and payout as sections, then amount and
       "To" side by side with the button under them. The two wrappers are
       `lg:contents`, so at lg they vanish and their children become the five
       columns of the bar. One form either way, so the control ids stay unique.
@@ -379,12 +376,11 @@ export function CompareSearch({
             </span>
           </span>
         )}
-        <div className="grid border-b-[3px] border-line sm:grid-cols-2 lg:contents">
-          {/* Vertical rules after the first two fields, desktop only. -my-4/py-4
-              (and -ms-6/ps-6 on the first) cancel the form's padding so the rules
-              and the hover tint run to the card's edges. */}
+        <div className="grid sm:grid-cols-2 lg:contents">
+          {/* -my-4/py-4 (and -ms-6/ps-6 on the first) cancel the form's padding so
+              the hover tint runs to the card's edges. */}
           <div
-            className={`min-w-0 border-b-[3px] border-line px-5 py-4 sm:border-e-[3px] sm:border-b-0 sm:px-7 sm:py-5
+            className={`min-w-0 px-5 py-4 sm:px-7 sm:py-5
                         lg:-my-4 lg:-ms-6 lg:-me-4 lg:rounded-s-[22px] lg:py-4 lg:ps-6 lg:pe-4 ${sectionHover}`}
             {...sectionProps(ids.from)}
           >
@@ -394,7 +390,7 @@ export function CompareSearch({
             <div className={fieldHeight}>{fromSelect(rowPlainTrigger)}</div>
           </div>
           <div
-            className={`min-w-0 px-5 py-4 sm:px-7 sm:py-5 lg:-my-4 lg:-me-4 lg:border-e-[3px] lg:border-line
+            className={`min-w-0 px-5 py-4 sm:px-7 sm:py-5 lg:-my-4 lg:-me-4
                         lg:py-4 lg:ps-4 lg:pe-4 ${sectionHover}`}
             {...sectionProps(ids.method)}
           >
@@ -420,8 +416,8 @@ export function CompareSearch({
 
   return (
     <form onSubmit={onSubmit} className={formClass}>
-      <div className="grid border-b-[3px] border-line sm:grid-cols-2">
-        <div className="min-w-0 border-b-[3px] border-line px-5 py-4 sm:border-e-[3px] sm:border-b-0 sm:px-7 sm:py-6">
+      <div className="grid sm:grid-cols-2">
+        <div className="min-w-0 px-5 py-4 sm:px-7 sm:py-6">
           <label htmlFor={ids.from} className={labelClass}>
             {t('sendingFrom')}
           </label>
