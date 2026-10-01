@@ -170,7 +170,8 @@ export function RateChart({
               className={`cursor-pointer px-5 py-2.5 text-[15px] font-bold whitespace-nowrap transition-colors ${
                 option.key === range
                   ? 'bg-brand text-white'
-                  : 'bg-surface text-ink-2 hover:bg-tint hover:text-tint-ink'
+                  : // The page's grey, so the tabs stand out on the white chart panel.
+                    'bg-mist text-ink-2 hover:bg-tint hover:text-tint-ink'
               }`}
             >
               {option.label}
