@@ -17,7 +17,7 @@ import { METHOD_CONTENT, methodBySlug } from '@/lib/content/methods'
 import { methodPath } from '@/lib/routes'
 import { getComparison } from '@/lib/quotes'
 import { corridorPath } from '@/lib/routes'
-import { publicPageMetadata } from '@/lib/seo'
+import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
 export const revalidate = 900
 
@@ -226,7 +226,7 @@ export default async function MethodPage({ params }: { params: Promise<{ locale:
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify([
+          __html: jsonLd([
             {
               '@context': 'https://schema.org',
               '@type': 'FAQPage',

@@ -73,6 +73,17 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      /**
+       * Alert pages carry a capability token in the path (/alerts/manage/<token>).
+       * The site-wide policy sends the full URL as the referrer on same-origin
+       * navigations, and the next page loads analytics, which records it: the
+       * token would end up in analytics. Listed after the site-wide rule
+       * so this value wins.
+       */
+      {
+        source: '/alerts/:path*',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      },
     ]
   },
 

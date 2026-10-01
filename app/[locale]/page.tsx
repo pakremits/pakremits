@@ -25,7 +25,7 @@ import { TodaysExample } from '@/components/todays-example'
 import { PAYOUT_OPTIONS } from '@/lib/payout'
 import { getProofStats } from '@/lib/proof/stats'
 import { CLAIM_FIRST_PAKISTAN_ONLY_SITE } from '@/lib/proof/config'
-import { publicPageMetadata } from '@/lib/seo'
+import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
 export async function generateMetadata({
   params,
@@ -497,7 +497,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLd({
             '@context': 'https://schema.org',
             '@type': 'FAQPage',
             mainEntity: faqs.map((faq) => ({

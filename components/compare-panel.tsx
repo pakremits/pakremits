@@ -10,7 +10,6 @@ import type { SortKey } from '@/lib/ranking/rank'
 import type { PayoutOption } from '@/components/select-icons'
 import { CompareSearch, type SearchCorridorOption, type SearchSelection } from '@/components/compare-search'
 import { ResultsSkeleton, ResultsView } from '@/components/compare-results'
-import { MIN_PENDING_MS } from '@/components/compare-navigation'
 import { PAYOUT_METHOD, initialPayoutOption } from '@/lib/payout'
 
 /**
@@ -23,7 +22,7 @@ import { PAYOUT_METHOD, initialPayoutOption } from '@/lib/payout'
  *
  * It wears the same search bar and result cards as /compare; the difference is
  * that nothing navigates. Editing the form changes nothing until Compare is
- * clicked; then the list shows its skeleton for at least MIN_PENDING_MS (as
+ * clicked; then the list shows its skeleton until the new quotes arrive (as
  * /compare does) and re-ranks here. A sort change re-fetches too, dimming the
  * list rather than replacing it.
  */
@@ -39,8 +38,6 @@ interface Props {
 
 /** The old panel's control ids, which deep links and the e2e suite rely on. */
 const PANEL_IDS = { from: 'from', method: 'method', amount: 'amt' }
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export function ComparePanel({ initial, corridors, initialPayout, switchCorridorPages = false }: Props) {
   const t = useTranslations('panel')
@@ -64,15 +61,12 @@ export function ComparePanel({ initial, corridors, initialPayout, switchCorridor
   // Lets a slow response from an earlier request lose to a newer one.
   const requestSeq = useRef(0)
 
-  async function load(
-    query: { corridor: string; method: string; amount: number; sort: SortKey },
-    minimum: number,
-  ) {
+  async function load(query: { corridor: string; method: string; amount: number; sort: SortKey }) {
     const seq = ++requestSeq.current
     setError(false)
     try {
       const params = new URLSearchParams({ ...query, amount: String(query.amount) })
-      const [response] = await Promise.all([fetch(`/api/quotes?${params}`), wait(minimum)])
+      const response = await fetch(`/api/quotes?${params}`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const payload = (await response.json()) as Comparison
       // A stale response must never overwrite a newer one.
@@ -91,7 +85,7 @@ export function ComparePanel({ initial, corridors, initialPayout, switchCorridor
     // A new search starts from the default sort, as a fresh /compare does.
     setSort('received')
     const method = PAYOUT_METHOD[selection.payout]
-    if (await load({ corridor: selection.corridor, method, amount, sort: 'received' }, MIN_PENDING_MS)) {
+    if (await load({ corridor: selection.corridor, method, amount, sort: 'received' })) {
       setPayoutOption(selection.payout)
     }
     setComparing(false)
@@ -101,7 +95,7 @@ export function ComparePanel({ initial, corridors, initialPayout, switchCorridor
     if (next === sort) return
     setSort(next)
     setSorting(true)
-    await load({ corridor: data.corridorSlug, method: data.deliveryMethod, amount: data.amount, sort: next }, 0)
+    await load({ corridor: data.corridorSlug, method: data.deliveryMethod, amount: data.amount, sort: next })
     setSorting(false)
   }
 

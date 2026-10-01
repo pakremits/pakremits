@@ -45,3 +45,13 @@ export function publicPageMetadata({
     },
   }
 }
+
+/**
+ * JSON for a `<script type="application/ld+json">` body. JSON.stringify leaves
+ * `<` as is, so a value containing `</script>` (a provider name or note from
+ * the database, say) would close the tag early and run what follows. `\u003c`
+ * is the same character to a JSON parser and inert to the HTML one.
+ */
+export function jsonLd(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, '\\u003c')
+}

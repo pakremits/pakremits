@@ -2,9 +2,8 @@
  * What /compare shows between a Compare click and the server's answer: the
  * page's own layout with every value greyed out. The search bar and title
  * depend on the query string, which a loading state cannot read, so they are
- * placeholders too. Once the page arrives the list keeps its skeleton until a
- * second after the click (see compare-navigation.tsx). The same placeholders
- * cover a new search made on /compare itself (see the page).
+ * placeholders too, and are replaced as soon as the page arrives. The same
+ * placeholders cover a new search made on /compare itself (see the page).
  */
 import { ResultsSkeleton } from '@/components/compare-results'
 import {

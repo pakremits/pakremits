@@ -20,7 +20,7 @@ import { formatPkr } from '@/lib/ranking/compute'
 import { getComparison } from '@/lib/quotes'
 import { providerAvailability, providerSupportsCorridor } from '@/lib/providers/availability'
 import { corridorPath } from '@/lib/routes'
-import { publicPageMetadata } from '@/lib/seo'
+import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
 export const revalidate = 900
 
@@ -307,7 +307,7 @@ export default async function ProviderPage({ params }: { params: Promise<{ local
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLd({
             '@context': 'https://schema.org',
             '@type': 'BreadcrumbList',
             itemListElement: [

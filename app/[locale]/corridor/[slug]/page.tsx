@@ -28,7 +28,7 @@ import {
 import { CORRIDOR_CONTENT } from '@/lib/content/corridors'
 import { formatPkr } from '@/lib/ranking/compute'
 import { getComparison, getMidMarketSeries } from '@/lib/quotes'
-import { publicPageMetadata } from '@/lib/seo'
+import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
 export const revalidate = 900
 
@@ -337,7 +337,7 @@ export default async function CorridorPage({ params }: { params: Promise<{ local
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify([
+          __html: jsonLd([
             {
               '@context': 'https://schema.org',
               '@type': 'FAQPage',

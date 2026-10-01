@@ -31,11 +31,18 @@ async function chooseOption(page: Page, controlId: string, optionName: string) {
   await page.getByRole('option', { name: new RegExp(`^${optionName}\\b`) }).click()
 }
 
-/** The panel only re-fetches on Compare; wait for its skeleton to give way. */
+/**
+ * The panel only re-fetches on Compare: wait for that request's answer, then
+ * for the skeleton to give way. Waiting on the response rather than on the
+ * skeleton appearing: a fast answer replaces the skeleton before a test could
+ * see it.
+ */
 async function compare(page: Page) {
   const skeleton = page.locator('#compare section[aria-busy=true]')
-  await page.locator('#compare button[type=submit]').click()
-  await expect(skeleton).toBeVisible()
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/api/quotes'), { timeout: 15_000 }),
+    page.locator('#compare button[type=submit]').click(),
+  ])
   await expect(skeleton).toHaveCount(0, { timeout: 15_000 })
 }
 
