@@ -16,7 +16,8 @@ import { alternatesFor, isLocale } from '@/i18n/routing'
 import { CORRIDORS, CURRENCY_SYMBOLS, corridorByCurrency, formatSend } from '@/lib/corridors'
 import { SEND_CURRENCIES, type SendCurrency } from '@/lib/db/schema'
 import { formatPkr, round } from '@/lib/ranking/compute'
-import { getComparison, getMidMarketSeries } from '@/lib/quotes'
+import { getComparison, getMidMarketHistory, getMidMarketSeries } from '@/lib/quotes'
+import { RateBackdrop } from '@/components/rate-backdrop'
 import { corridorPath } from '@/lib/routes'
 import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
@@ -69,10 +70,14 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
 
   const symbol = CURRENCY_SYMBOLS[currency]
 
-  const [series90, comparison] = await Promise.all([
+  const [series90, history, comparison] = await Promise.all([
     getMidMarketSeries(currency, 90),
+    getMidMarketHistory(currency, 90),
     getComparison({ corridorSlug: corridor.slug, method: 'bank' }),
   ])
+  // The banner's gold line: the last 30 days.
+  const backdropFrom = (history.daily.at(-1)?.t ?? 0) - 30 * 24 * 60 * 60 * 1000
+  const backdropPoints = history.daily.filter((point) => point.t >= backdropFrom)
 
   const latest = series90.latest
   const best = comparison?.rows.find((r) => r.isBest)
@@ -110,24 +115,21 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
     { label: '90 days', value: changeOver(90) },
   ]
 
-  // Label the chart with the history we actually have, not what we asked for.
-  const daysCovered =
-    series90.points.length >= 2
-      ? Math.round(
-          (series90.points[series90.points.length - 1].date.getTime() -
-            series90.points[0].date.getTime()) /
-            (24 * 60 * 60 * 1000),
-        )
-      : 0
 
   return (
     <>
       <SiteHeader locale={locale} />
 
       <main>
-        <div className="bg-[#024e38] px-0 pt-10 pb-24 text-[#f3f6f4]">
-          <div className="mx-auto max-w-[1120px] px-6">
-            <nav aria-label="Breadcrumb" className="text-[13px] text-[#9fd3c1]">
+        {/* The home banner's gradient, with the last month's rate drawn in gold
+            along its foot. Taller than the text needs, to give the line room. */}
+        <div className="hero-gradient relative overflow-hidden px-0 pt-12 pb-44 text-white sm:pt-14 sm:pb-52">
+          <RateBackdrop
+            points={backdropPoints}
+            className="absolute inset-x-0 bottom-0 h-[170px] w-full sm:h-[230px]"
+          />
+          <div className="relative mx-auto max-w-[1120px] px-6">
+            <nav aria-label="Breadcrumb" className="text-[13px] text-white/70">
               <ol className="flex items-center gap-2">
                 <li>
                   <Link href="/" className="no-underline hover:text-white">
@@ -135,7 +137,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
                   </Link>
                 </li>
                 <li aria-hidden="true">/</li>
-                <li className="text-[#cdeee2]">{currency} to PKR</li>
+                <li className="text-white/90">{currency} to PKR</li>
               </ol>
             </nav>
 
@@ -148,7 +150,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
                 <div className="font-display text-[clamp(48px,8vw,84px)] leading-none font-semibold tabular-nums text-white">
                   {latest?.toFixed(2) ?? '—'}
                 </div>
-                <p className="mt-2 text-[15px] text-[#b7e4d4]">
+                <p className="mt-2 max-w-[60ch] text-[15px] text-white/80">
                   Mid-market reference for 1 {currency}. No provider gives you this rate — it is the
                   line they are measured against.
                 </p>
@@ -157,13 +159,13 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
               <dl className="flex gap-8">
                 {windows.map((window) => (
                   <div key={window.label}>
-                    <dt className="text-[13px] text-[#9fd3c1]">{window.label}</dt>
+                    <dt className="text-[13px] text-white/70">{window.label}</dt>
                     <dd
                       className="mt-1 font-display text-xl font-semibold tabular-nums"
                       style={{
                         color:
                           window.value === null
-                            ? '#b7e4d4'
+                            ? 'rgba(255,255,255,.7)'
                             : window.value >= 0
                               ? 'var(--color-up)'
                               : 'var(--color-down)',
@@ -222,12 +224,7 @@ export default async function RatePage({ params }: { params: Promise<{ locale: s
           )}
 
           <section className="mt-14">
-            <RateChart
-              points={series90.points}
-              currency={currency}
-              label={`${currency} to PKR, last ${daysCovered} days`}
-              height={280}
-            />
+            <RateChart history={history} currency={currency} title={`${currency} to PKR`} defaultRange="all" height={280} />
           </section>
 
           <section className="mt-14 max-w-[68ch]">

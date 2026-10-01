@@ -91,7 +91,8 @@ export const en = {
     payoutCash: 'Collected in person at a pickup point, with their CNIC.',
     payoutRda: 'For Pakistanis abroad who hold a Roshan Digital Account.',
 
-    alertChartLabel: '{currency} to PKR, last 30 days',
+    // The chart adds the range itself ("last 30 days").
+    alertChartLabel: '{currency} to PKR',
 
     statComparedBody:
       'Services compared on this corridor. We add providers only where we can get a live quote ' +

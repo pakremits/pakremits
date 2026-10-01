@@ -7,7 +7,7 @@ import { HERO_ORIGINS } from '@/lib/hero/origins'
 import { SiteFooter, SiteHeader } from '@/components/site-chrome'
 import { eq } from 'drizzle-orm'
 import { CORRIDORS, CURRENCY_SYMBOLS, defaultAmountFor, formatSend } from '@/lib/corridors'
-import { getBestRatePerCorridor, getComparison, getMidMarketSeries } from '@/lib/quotes'
+import { getBestRatePerCorridor, getComparison, getMidMarketHistory, getMidMarketSeries } from '@/lib/quotes'
 import { db } from '@/lib/db'
 import { providers as providersTable } from '@/lib/db/schema'
 import type { SendCurrency } from '@/lib/db/schema'
@@ -112,7 +112,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     getComparison({ corridorSlug: EXAMPLE_CORRIDOR.slug, amount: EXAMPLE_AMOUNT }),
     getProofStats(),
     listRosterProviders(),
-    getMidMarketSeries(EXAMPLE_CORRIDOR.fromCurrency, 30),
+    getMidMarketHistory(EXAMPLE_CORRIDOR.fromCurrency, 90),
   ])
 
   const exampleSendLabel = formatSend(CURRENCY_SYMBOLS[EXAMPLE_CORRIDOR.fromCurrency], EXAMPLE_AMOUNT)
@@ -435,9 +435,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           className="mt-24"
           aside={
             <RateChart
-              points={exampleSeries.points}
+              history={exampleSeries}
               currency={EXAMPLE_CORRIDOR.fromCurrency}
-              label={t('alertChartLabel', { currency: EXAMPLE_CORRIDOR.fromCurrency })}
+              title={t('alertChartLabel', { currency: EXAMPLE_CORRIDOR.fromCurrency })}
               height={200}
               bare
             />

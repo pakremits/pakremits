@@ -29,7 +29,7 @@ import { CORRIDOR_CONTENT } from '@/lib/content/corridors'
 import { METHOD_CONTENT } from '@/lib/content/methods'
 import { methodPath } from '@/lib/routes'
 import { formatPkr } from '@/lib/ranking/compute'
-import { getComparison, getMidMarketSeries } from '@/lib/quotes'
+import { getComparison, getMidMarketHistory } from '@/lib/quotes'
 import { publicPageMetadata, jsonLd } from '@/lib/seo'
 
 export const revalidate = 900
@@ -87,9 +87,9 @@ export default async function CorridorPage({ params }: { params: Promise<{ local
   const content = CORRIDOR_CONTENT[corridor.fromCurrency]
   const symbol = CURRENCY_SYMBOLS[corridor.fromCurrency]
 
-  const [comparison, series] = await Promise.all([
+  const [comparison, history] = await Promise.all([
     getComparison({ corridorSlug: slug, method: 'bank' }),
-    getMidMarketSeries(corridor.fromCurrency, 30),
+    getMidMarketHistory(corridor.fromCurrency, 90),
   ])
 
   const corridorOptions = CORRIDORS.map((c) => ({
@@ -235,13 +235,9 @@ export default async function CorridorPage({ params }: { params: Promise<{ local
         </div>
 
         <div className="mx-auto max-w-[1120px] px-6">
-          {/* 30-day chart */}
+          {/* Rate chart, opening on the last month */}
           <section className="mt-16">
-            <RateChart
-              points={series.points}
-              currency={corridor.fromCurrency}
-              label={`${corridor.fromCurrency} to PKR, last 30 days`}
-            />
+            <RateChart history={history} currency={corridor.fromCurrency} title={`${corridor.fromCurrency} to PKR`} />
           </section>
 
           {/* Editorial */}

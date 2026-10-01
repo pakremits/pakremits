@@ -400,6 +400,44 @@ export async function getMidMarketSeries(
   }
 }
 
+/** A chart point as plain numbers, so it can cross into a client component. */
+export interface RatePoint {
+  /** Epoch milliseconds. */
+  t: number
+  rate: number
+}
+
+export interface RateHistory {
+  /** One point per day, oldest first, up to `days` back. */
+  daily: RatePoint[]
+  /** Every capture in the last 24 hours, oldest first; empty if there are none. */
+  intraday: RatePoint[]
+}
+
+/**
+ * Everything the interactive rate chart needs: daily points for the week,
+ * month and full views, and the raw 15-minute captures for the 24-hour view.
+ */
+export async function getMidMarketHistory(currency: SendCurrency, days = 90): Promise<RateHistory> {
+  const [series, rows] = await Promise.all([
+    getMidMarketSeries(currency, days),
+    safeRead(`getMidMarketHistory(${currency})`, [], () =>
+      db.execute(sql`
+        SELECT ${midMarketRates.capturedAt} AS at, ${midMarketRates.rate} AS rate
+        FROM ${midMarketRates}
+        WHERE ${midMarketRates.fromCurrency} = ${currency}
+          AND ${midMarketRates.capturedAt} > now() - interval '24 hours'
+        ORDER BY ${midMarketRates.capturedAt}
+      `),
+    ) as unknown as Promise<{ at: Date | string; rate: string }[]>,
+  ])
+
+  return {
+    daily: series.points.map((point) => ({ t: point.date.getTime(), rate: point.rate })),
+    intraday: rows.map((row) => ({ t: new Date(row.at).getTime(), rate: toNum(row.rate) })),
+  }
+}
+
 /** Best available rate per corridor, for the home page's corridor chips. */
 export async function getBestRatePerCorridor(): Promise<
   {

@@ -141,7 +141,7 @@ export const ur: Messages = {
     payoutCash: 'شناختی کارڈ دکھا کر کسی پک اپ پوائنٹ سے نقد وصولی۔',
     payoutRda: 'بیرونِ ملک مقیم پاکستانیوں کے لیے جن کا روشن ڈیجیٹل اکاؤنٹ ہے۔',
 
-    alertChartLabel: '{currency} سے PKR، پچھلے 30 دن',
+    alertChartLabel: '{currency} سے PKR',
 
     // TODO: native review
     statComparedBody:
