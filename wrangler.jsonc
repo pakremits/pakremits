@@ -7,6 +7,13 @@
   // secrets below, which the shared code in lib/ reads.
   "compatibility_flags": ["nodejs_compat"],
 
+  // The site's one address. Each deploy attaches it as a Custom Domain, which
+  // brings its own DNS record and certificate; any other DNS record for the
+  // hostname has to be deleted first. workers.dev stays off, so nothing else
+  // serves a second copy.
+  "routes": [{ "pattern": "stage.pakremits.com", "custom_domain": true }],
+  "workers_dev": false,
+
   // The site: every page, data file and image that `npm run build` writes to
   // out/, served as static assets (free and unlimited on Workers). out/_headers
   // and out/_redirects carry the headers and redirects.

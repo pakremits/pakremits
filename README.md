@@ -274,7 +274,8 @@ Done by the Cloudflare account's owner. Workers Free is enough.
 
 3. **A Cloudflare API token** for the deploys: **My Profile → API Tokens →
    Create Token**. Start from the *Edit Cloudflare Workers* template and make
-   sure it has **Workers Scripts: Edit**, **D1: Edit** and, for backups,
+   sure it has **Workers Scripts: Edit**, **D1: Edit**, **Workers Routes:
+   Edit** on the site's zone (to attach its custom domain) and, for backups,
    **Workers R2 Storage: Edit**, limited to your account. A second, D1-only
    token for the refresh is optional (`CLOUDFLARE_D1_TOKEN`).
 
@@ -287,7 +288,7 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    | Secret | `CLOUDFLARE_D1_TOKEN` | Optional D1-only token for the refresh |
    | Secret | `RESEND_API_KEY` | Sends the rate alerts and digests the refresh triggers |
    | Variable | `CLOUDFLARE_ACCOUNT_ID` | The account's id |
-   | Variable | `SITE_URL` | `https://stage.pakremits.com`; the Worker's `workers.dev` address until step 6 |
+   | Variable | `SITE_URL` | `https://stage.pakremits.com`, the custom domain in `wrangler.jsonc` |
    | Variable | `REFRESH_INTERVAL_MINUTES` | `1440` |
    | Variable | `TURNSTILE_SITE_KEY` | The public key of a Turnstile widget that lists this site's hostname |
    | Variable | `GTM_ID` | `GTM-N4ZV897G` on staging; unset for none |
@@ -299,7 +300,12 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    every environment that does not set its own, so set `SITE_URL` on each
    environment explicitly.
 
-5. **Worker secrets**, once the first publish has created the Worker:
+5. **The address.** The hostname is the custom domain in `wrangler.jsonc`
+   (`routes`), which every deploy attaches along with its DNS record and
+   certificate. Cloudflare will not take over a hostname that already has a
+   DNS record, so delete any record for it before the first publish.
+
+6. **Worker secrets**, once the first publish has created the Worker:
 
    ```bash
    npx wrangler secret put ADMIN_PASSWORD
@@ -310,11 +316,6 @@ Done by the Cloudflare account's owner. Workers Free is enough.
 
    `GITHUB_DISPATCH_TOKEN` is for the admin's **Publish now**: a fine-grained
    GitHub token for this repository only, with **Actions: Read and write**.
-
-6. **The address.** Delete any existing DNS record for the hostname, then
-   attach it to the Worker: **Workers & Pages → pakremits-staging → Settings →
-   Domains & Routes → Add → Custom domain**. Cloudflare creates the DNS record
-   and certificate. Then change `SITE_URL` to the new address and publish.
 
 7. **Recommended:** a branch ruleset on `main` requiring a pull request and the
    `verify` and `migrations` checks, with force pushes blocked. Never add path
