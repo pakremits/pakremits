@@ -130,6 +130,7 @@ on a fresh database and the fake data is trivially identifiable.
 | `npm run db:migrate:local` | Apply pending migrations to the local database |
 | `npm run db:migrate:remote` | The same against the real database (every publish does this first) |
 | `npm run db:check` | Run each kind of query once and print a summary |
+| `D1_TARGET=remote npm run db:contract` | Check the D1 REST API still behaves as the refresh expects |
 | `npm run e2e` | Playwright end-to-end suite against `npm run preview` ([test/e2e/README.md](./test/e2e/README.md)) |
 | `npm run e2e:ui` | The same, in Playwright's UI mode |
 
@@ -204,9 +205,12 @@ Production (`pakremits.com`) will be its own Worker and database, with
 `publish.yml` runs one release at a time per environment, queued and never
 cancelled halfway:
 
-1. **Migrates.** Applies pending migrations to D1.
+1. **Migrates.** Applies pending migrations to the database `wrangler.jsonc`
+   binds as `DB`.
 2. **Refreshes**, if asked and unless the last refresh is recent. An empty
-   database is seeded first.
+   database is seeded first. Before writing anything it checks that the D1
+   REST API still behaves as `lib/db/d1-http.ts` expects
+   (`npm run db:contract`).
 3. **Copies the database.** Exports D1 into a local copy for the build, and
    backs the export up to a private R2 bucket. Never to an Actions artifact:
    the repository is public and `rate_alerts` holds email addresses.
@@ -220,6 +224,9 @@ cancelled halfway:
    record the clicks and comparisons behind the public figures.
 7. **Rolls back** with `wrangler rollback` if the smoke test fails. The job
    still fails, so someone looks.
+8. **Records D1 usage** for the last 24 hours in the run's summary, against the
+   free plan's daily allowance. The allowance is per Cloudflare account, so
+   other projects on the same account count against it too.
 
 **Migrations must keep working with the release that is still serving**,
 because they run before the deploy and a rollback does not reverse them. Add
@@ -284,7 +291,6 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    | Secret | `CLOUDFLARE_D1_TOKEN` | Optional D1-only token for the refresh |
    | Secret | `RESEND_API_KEY` | Sends the rate alerts and digests the refresh triggers |
    | Variable | `CLOUDFLARE_ACCOUNT_ID` | The account's id |
-   | Variable | `D1_DATABASE_ID` | The same id as in `wrangler.jsonc` |
    | Variable | `SITE_URL` | `https://stage.pakremits.com`, or the preview's `workers.dev` address |
    | Variable | `REFRESH_INTERVAL_MINUTES` | `1440` |
    | Variable | `TURNSTILE_SITE_KEY` | The public key of a Turnstile widget that lists this site's hostname |

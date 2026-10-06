@@ -21,6 +21,9 @@ production data or credentials.
 - `scripts/seed.ts` and `scripts/seed-proof-demo.ts` — starter data
 - `scripts/refresh-local.ts` — the refresh entry point
 - `scripts/db-check.ts` — runs each kind of query once and prints a summary
+- `scripts/d1-contract.ts` — checks that the REST API still binds values,
+  batches and returns rows the way `d1-http.ts` relies on; every publish runs
+  it before a refresh
 
 ## Three ways in
 
