@@ -3,10 +3,14 @@ import { defineConfig, devices } from '@playwright/test'
 /**
  * End-to-end config.
  *
- * `reuseExistingServer` locally so a run does not fight the dev server you
- * already have open; CI starts its own. The suite needs a seeded database with
- * live quotes — see test/e2e/README.md.
+ * Runs against the built site served the way production serves it: the
+ * static files and the Worker, through `wrangler dev` (`npm run preview`).
+ * `reuseExistingServer` locally so a run does not fight one you already have
+ * open; set E2E_BASE_URL to test any other deployment instead. The suite needs
+ * a seeded local D1 with live quotes and a build — see test/e2e/README.md.
  */
+const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:8787'
+
 export default defineConfig({
   testDir: './test/e2e',
   // The comparison panel debounces at 350ms and then waits on a network round
@@ -20,7 +24,10 @@ export default defineConfig({
   reporter: process.env.CI ? 'list' : [['list']],
 
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
+    baseURL,
+    // E2E_CHANNEL=chrome runs the installed Chrome instead of Playwright's
+    // own download (`npx playwright install`).
+    ...(process.env.E2E_CHANNEL ? { channel: process.env.E2E_CHANNEL } : {}),
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -30,10 +37,12 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
 
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: 'npm run preview',
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 })

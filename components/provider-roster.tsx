@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { type Locale, localePath } from '@/i18n/routing'
 import { ProviderLogo } from '@/components/provider-logo'
-import { REFRESH_MINUTES } from '@/lib/proof/config'
+import { refreshCadence } from '@/lib/cadence'
 import { providerPath } from '@/lib/routes'
 
 export interface RosterProvider {
@@ -41,7 +41,7 @@ export async function ProviderRoster({
             {t('providersTitle')}
           </h2>
           <p className="mt-3 text-[17px] text-muted">
-            {t('providersLede', { count: providers.length, minutes: REFRESH_MINUTES })}
+            {t('providersLede', { count: providers.length, cadence: refreshCadence(locale) })}
           </p>
         </div>
         <Link

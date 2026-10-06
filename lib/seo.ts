@@ -13,7 +13,7 @@ export function publicPageMetadata({
   description,
   path,
   alternates,
-  image = '/opengraph-image',
+  image = '/og/default.png',
   type = 'website',
   index = true,
 }: {

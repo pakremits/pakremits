@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { AdminMenu } from '@/components/admin-menu'
+import { AdminPageClock } from '@/components/admin-page-clock'
+import { AdminPublishButton } from '@/components/admin-publish-button'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 /**
@@ -11,25 +13,6 @@ import { ThemeToggle } from '@/components/theme-toggle'
  * Desktop has the sections in AdminSidebar (in the admin layout); below lg
  * this header's bar opens them in a drawer (AdminMenu).
  */
-
-const PKT_NOW = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Karachi',
-  weekday: 'short',
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
-/**
- * The time the page was rendered, in Pakistan time. Module scope because a
- * clock read in render trips react-hooks/purity; admin pages are dynamic, so
- * this still runs once per request.
- */
-function renderedAt(): string {
-  return PKT_NOW.format(new Date())
-}
 
 export function AdminHeader({
   title,
@@ -66,8 +49,9 @@ export function AdminHeader({
                 <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
                 <path d="M3.5 10h17M8 3v4M16 3v4" />
               </svg>
-              {renderedAt()} PKT
+              <AdminPageClock />
             </span>
+            <AdminPublishButton />
             <Link
               href="/"
               className="hidden h-10 items-center gap-1.5 rounded-control border border-line bg-surface px-3.5 text-[14px] font-semibold whitespace-nowrap text-ink

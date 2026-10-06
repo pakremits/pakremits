@@ -29,10 +29,10 @@ describe('allow', () => {
 })
 
 describe('clientIp', () => {
-  it("prefers Fly's header, then the first X-Forwarded-For hop", () => {
-    const fly = new Request('http://x', { headers: { 'fly-client-ip': '1.1.1.1', 'x-forwarded-for': '2.2.2.2' } })
+  it("prefers Cloudflare's header, then the first X-Forwarded-For hop", () => {
+    const cf = new Request('http://x', { headers: { 'cf-connecting-ip': '1.1.1.1', 'x-forwarded-for': '2.2.2.2' } })
     const xff = new Request('http://x', { headers: { 'x-forwarded-for': '3.3.3.3, 10.0.0.1' } })
-    expect(clientIp(fly)).toBe('1.1.1.1')
+    expect(clientIp(cf)).toBe('1.1.1.1')
     expect(clientIp(xff)).toBe('3.3.3.3')
   })
 })

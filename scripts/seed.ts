@@ -1,7 +1,9 @@
 /**
- * Seed: providers, corridors, and 30 days of mid-market history.
+ * Seed: providers, corridors, and 90 days of mid-market history.
  *
- * Run with `npm run seed`. Idempotent — safe to re-run after adding a provider.
+ * Run with `npm run seed` (the local D1) or `D1_TARGET=remote npm run seed`.
+ * The providers, corridors and benchmarks are idempotent — safe to re-run after
+ * adding a provider. The history is not: re-running adds a second copy of it.
  *
  * The history is fetched live from Wise where possible so a fresh deploy shows
  * real sparklines immediately. If that fetch fails it falls back to a synthetic
@@ -9,10 +11,11 @@
  * so it can be deleted once real history accumulates.
  */
 import '../lib/load-env'
-import { desc } from 'drizzle-orm'
+import { count, desc } from 'drizzle-orm'
 import { getMidMarketHistory, getMidMarketRate } from '../lib/fx'
 import { CORRIDORS, CURRENCY_SYMBOLS } from '../lib/corridors'
-import { db } from '../lib/db'
+import { db, runBatch, toRate } from '../lib/db'
+import { connectNodeD1 } from '../lib/db/node'
 import { type SendCurrency, corridors, midMarketRates, providers } from '../lib/db/schema'
 import { refreshBenchmarks } from '../lib/proof/benchmarks'
 
@@ -255,50 +258,54 @@ const PROVIDERS = [
 ]
 
 async function seedProviders() {
-  for (const provider of PROVIDERS) {
-    await db
-      .insert(providers)
-      .values(provider)
-      .onConflictDoUpdate({
-        target: providers.slug,
-        // Deliberately does not overwrite affiliateUrlTemplate or featured —
-        // those are set in production and must survive a reseed.
-        set: {
-          name: provider.name,
-          brandColor: provider.brandColor,
-          brandTextColor: provider.brandTextColor,
-          homepageUrl: provider.homepageUrl,
-          supportsBank: provider.supportsBank,
-          supportsWallet: provider.supportsWallet,
-          supportsNeobank: provider.supportsNeobank,
-          supportsCash: provider.supportsCash,
-          supportsRda: provider.supportsRda,
-        },
-      })
-  }
+  await runBatch(
+    PROVIDERS.map((provider) =>
+      db
+        .insert(providers)
+        .values(provider)
+        .onConflictDoUpdate({
+          target: providers.slug,
+          // Deliberately does not overwrite affiliateUrlTemplate or featured —
+          // those are set in production and must survive a reseed.
+          set: {
+            name: provider.name,
+            brandColor: provider.brandColor,
+            brandTextColor: provider.brandTextColor,
+            homepageUrl: provider.homepageUrl,
+            supportsBank: provider.supportsBank,
+            supportsWallet: provider.supportsWallet,
+            supportsNeobank: provider.supportsNeobank,
+            supportsCash: provider.supportsCash,
+            supportsRda: provider.supportsRda,
+          },
+        }),
+    ),
+  )
   console.log(`✓ ${PROVIDERS.length} providers`)
 }
 
 async function seedCorridors() {
-  for (const corridor of CORRIDORS) {
-    await db
-      .insert(corridors)
-      .values({
-        slug: corridor.slug,
-        fromCurrency: corridor.fromCurrency,
-        fromCountry: corridor.fromCountry,
-        fromCountryName: corridor.fromCountryName,
-        toCurrency: 'PKR',
-        currencySymbol: CURRENCY_SYMBOLS[corridor.fromCurrency],
-      })
-      .onConflictDoUpdate({
-        target: corridors.slug,
-        set: {
+  await runBatch(
+    CORRIDORS.map((corridor) =>
+      db
+        .insert(corridors)
+        .values({
+          slug: corridor.slug,
+          fromCurrency: corridor.fromCurrency,
+          fromCountry: corridor.fromCountry,
           fromCountryName: corridor.fromCountryName,
+          toCurrency: 'PKR',
           currencySymbol: CURRENCY_SYMBOLS[corridor.fromCurrency],
-        },
-      })
-  }
+        })
+        .onConflictDoUpdate({
+          target: corridors.slug,
+          set: {
+            fromCountryName: corridor.fromCountryName,
+            currencySymbol: CURRENCY_SYMBOLS[corridor.fromCurrency],
+          },
+        }),
+    ),
+  )
   console.log(`✓ ${CORRIDORS.length} corridors`)
 }
 
@@ -330,7 +337,20 @@ function syntheticHistory(anchorRate: number, days: number, seedText: string) {
   return points
 }
 
-async function seedMidMarketHistory(days = 30) {
+/** Rows per history insert: 5 columns each, under D1's 100 bound parameters. */
+const HISTORY_ROWS_PER_INSERT = 20
+
+/**
+ * 90 days, so the charts' 3M range has history from the first day. Skipped
+ * when the table already has rows: a second copy would double every point.
+ */
+async function seedMidMarketHistory(days = 90) {
+  const [existing] = await db.select({ n: count() }).from(midMarketRates)
+  if ((existing?.n ?? 0) > 0) {
+    console.log(`✓ mid-market history: ${existing.n} rows already, left alone`)
+    return
+  }
+
   let real = 0
   let synthetic = 0
 
@@ -359,15 +379,18 @@ async function seedMidMarketHistory(days = 30) {
 
     if (points.length === 0) continue
 
-    await db.insert(midMarketRates).values(
-      points.map((p) => ({
-        fromCurrency: corridor.fromCurrency,
-        toCurrency: 'PKR',
-        rate: String(p.rate),
-        capturedAt: p.date,
-        source,
-      })),
-    )
+    const rows = points.map((p) => ({
+      fromCurrency: corridor.fromCurrency,
+      toCurrency: 'PKR',
+      rate: toRate(p.rate),
+      capturedAt: p.date,
+      source,
+    }))
+    const inserts = []
+    for (let start = 0; start < rows.length; start += HISTORY_ROWS_PER_INSERT) {
+      inserts.push(db.insert(midMarketRates).values(rows.slice(start, start + HISTORY_ROWS_PER_INSERT)))
+    }
+    await runBatch(inserts)
   }
 
   console.log(`✓ mid-market history: ${real} real, ${synthetic} synthetic`)
@@ -398,11 +421,13 @@ async function seedBankBenchmarks() {
 }
 
 async function main() {
-  console.log('Seeding PakRemits…')
+  const d1 = await connectNodeD1()
+  console.log(`Seeding PakRemits (${d1.target} D1)…`)
   await seedProviders()
   await seedCorridors()
   await seedMidMarketHistory()
   await seedBankBenchmarks()
+  await d1.close()
   console.log('Done. Run `npm run refresh` to pull the first live quotes.')
   process.exit(0)
 }

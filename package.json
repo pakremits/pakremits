@@ -3,17 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "tsx scripts/with-local-d1.ts next dev",
+    "build": "tsx scripts/with-local-d1.ts next build && tsx scripts/write-static-config.ts",
+    "preview": "wrangler dev --port 8787 --ip 127.0.0.1",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:check": "tsx scripts/db-check.ts",
+    "db:contract": "tsx scripts/d1-contract.ts",
     "seed": "tsx scripts/seed.ts",
     "providers:sync": "tsx scripts/sync-rate-providers.ts",
     "probe": "tsx scripts/probe.ts",
@@ -27,13 +28,13 @@
     "libphonenumber-js": "^1.13.12",
     "next": "16.3.8",
     "next-intl": "^4.14.2",
-    "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "semver": "^6.3.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -47,6 +48,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "wrangler": "^4.147.0"
   }
 }

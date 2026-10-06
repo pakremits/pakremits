@@ -1,0 +1,308 @@
+name: Publish
+
+# The one way a release goes live: optionally refresh the rates, then build
+# the site from the database and deploy it with the Worker. Called by
+# daily.yml (the scheduled refresh) and ci.yml (a merge to main).
+#
+#   migrations ─► [refresh] ─► export D1 ─► local copy ─► next build ─► deploy ─► smoke
+#                                  └─► backup to R2
+#
+# Everything runs against one GitHub environment, whose secrets and variables
+# are listed in README.md.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: The GitHub environment, which names the Worker too (see WRANGLER_ENV)
+        type: string
+        required: true
+      refresh:
+        description: Fetch fresh rates first, unless the last refresh is recent
+        type: boolean
+        default: false
+      force:
+        description: Refresh even if the last refresh was recent
+        type: boolean
+        default: false
+      deploy_without_refresh:
+        description: Publish even when the refresh is skipped (new code, not just new rates)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # Naming the shell runs steps with -eo pipefail.
+    shell: bash
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.SITE_URL }}
+    # One publish per environment at a time, never cancelled halfway. `queue:
+    # max` keeps every waiting run rather than replacing the one already
+    # waiting, so a merge to main cannot cancel the day's refresh, or the
+    # other way round. ci.yml publishes only main's tip, so the newest commit
+    # is always the last to deploy.
+    concurrency:
+      group: publish-${{ inputs.environment }}
+      cancel-in-progress: false
+      queue: max
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      SITE_URL: ${{ vars.SITE_URL }}
+      # Staging is the top level of wrangler.jsonc. Any other environment (a
+      # production one, later) is the wrangler env of the same name.
+      WRANGLER_ENV: ${{ inputs.environment != 'staging' && inputs.environment || '' }}
+      NEXT_TELEMETRY_DISABLED: '1'
+      NO_COLOR: '1'
+    steps:
+      - name: Check the environment is set up
+        run: |
+          : "${CLOUDFLARE_API_TOKEN:?secret CLOUDFLARE_API_TOKEN is missing from the ${{ inputs.environment }} environment}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?variable CLOUDFLARE_ACCOUNT_ID is missing from the ${{ inputs.environment }} environment}"
+          : "${SITE_URL:?variable SITE_URL is missing from the ${{ inputs.environment }} environment}"
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.19.0
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      # The database is the one wrangler.jsonc binds as DB for this
+      # environment, so its id lives in one place.
+      - name: Wrangler flags and the database id
+        run: |
+          flag="${WRANGLER_ENV:+--env $WRANGLER_ENV}"
+          id="$(npx wrangler d1 info DB $flag --json | jq -r .uuid)"
+          [ -n "$id" ] && [ "$id" != null ] || { echo "::error::no D1 database for the DB binding"; exit 1; }
+          echo "Database $id"
+          {
+            echo "ENV_FLAG=$flag"
+            echo "D1_DATABASE_ID=$id"
+          } >> "$GITHUB_ENV"
+
+      # Expand-only migrations, so code still running reads the new schema fine.
+      - name: Apply pending migrations
+        run: npx wrangler d1 migrations apply DB --remote $ENV_FLAG
+
+      # Whether to refresh, and whether to publish at all. Spare schedule ticks
+      # keep the refresh going when GitHub drops one; a refresh within the last
+      # five sixths of the interval (20 hours of a day) lets a spare through
+      # without doing anything, while a late tick still refreshes.
+      - name: Plan
+        id: plan
+        env:
+          INTERVAL_MINUTES: ${{ vars.REFRESH_INTERVAL_MINUTES || '1440' }}
+        run: |
+          refresh=false
+          publish=true
+          if [ "${{ inputs.refresh }}" = true ]; then
+            refresh=true
+            if [ "${{ inputs.force }}" != true ]; then
+              last="$(npx wrangler d1 execute DB --remote $ENV_FLAG --json --command \
+                "SELECT coalesce(max(started_at), 0) AS at FROM cron_runs WHERE finished_at IS NOT NULL" \
+                | jq -r '.[0].results[0].at')"
+              age_minutes=$(( ($(date +%s%3N) - last) / 60000 ))
+              gate_minutes=$(( INTERVAL_MINUTES * 5 / 6 ))
+              echo "Last finished refresh: ${age_minutes} minutes ago (refreshing after ${gate_minutes})"
+              if [ "$last" -gt 0 ] && [ "$age_minutes" -lt "$gate_minutes" ]; then
+                refresh=false
+                [ "${{ inputs.deploy_without_refresh }}" = true ] || publish=false
+                echo "Rates refreshed $(( age_minutes / 60 ))h ago, so no refresh this time." >> "$GITHUB_STEP_SUMMARY"
+              fi
+            fi
+          fi
+          # A new database has no providers or corridors to refresh until seeded.
+          corridors="$(npx wrangler d1 execute DB --remote $ENV_FLAG --json --command \
+            "SELECT count(*) AS n FROM corridors" | jq -r '.[0].results[0].n')"
+          seed=false
+          if [ "$corridors" = 0 ]; then seed=true; refresh=true; publish=true; fi
+          echo "seed=$seed refresh=$refresh publish=$publish"
+          {
+            echo "seed=$seed"
+            echo "refresh=$refresh"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+
+      # The refresh writes through the D1 REST API, which promises less than
+      # lib/db/d1-http.ts relies on. A change on Cloudflare's side stops the run
+      # here rather than corrupting data.
+      - name: Check the D1 API
+        if: steps.plan.outputs.refresh == 'true'
+        env:
+          D1_TARGET: remote
+          CLOUDFLARE_D1_TOKEN: ${{ secrets.CLOUDFLARE_D1_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run db:contract
+
+      - name: Install Chromium for the browser-backed adapters
+        if: steps.plan.outputs.refresh == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Refresh rates
+        if: steps.plan.outputs.refresh == 'true'
+        env:
+          D1_TARGET: remote
+          # A D1-only token if one is set, otherwise the deploy token.
+          CLOUDFLARE_D1_TOKEN: ${{ secrets.CLOUDFLARE_D1_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          BHEJO_ALLOW_BROWSER: '1'
+          BHEJO_DISABLED_ADAPTERS: ${{ vars.BHEJO_DISABLED_ADAPTERS }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: PakRemits alerts <alerts@pakremits.com>
+          NODE_ENV: production
+        run: |
+          if [ "${{ steps.plan.outputs.seed }}" = true ]; then
+            # Providers, corridors, 90 days of mid-market history, benchmarks.
+            npm run seed
+          else
+            npm run providers:sync
+          fi
+          npm run refresh
+
+      # The build reads a local copy, not the API: no rate limits, and one
+      # consistent snapshot for every page. Schema first: the export lists
+      # tables alphabetically, so data alone would insert before its parents.
+      - name: Copy the database for the build
+        if: steps.plan.outputs.publish == 'true'
+        run: |
+          mkdir -p .wrangler/export
+          npx wrangler d1 export DB --remote $ENV_FLAG --no-data --output .wrangler/export/schema.sql
+          npx wrangler d1 export DB --remote $ENV_FLAG --no-schema --output .wrangler/export/data.sql
+          npx wrangler d1 execute DB --local $ENV_FLAG --file .wrangler/export/schema.sql --yes
+          npx wrangler d1 execute DB --local $ENV_FLAG --file .wrangler/export/data.sql --yes
+
+      # Straight after the export, so a failed build cannot skip it. A private
+      # bucket, never an Actions artifact: the repository is public and
+      # rate_alerts holds email addresses.
+      - name: Back up the database to R2
+        if: steps.plan.outputs.publish == 'true' && vars.BACKUP_BUCKET != ''
+        run: |
+          day="$(date -u +%F)"
+          for part in schema data; do
+            npx wrangler r2 object put "${{ vars.BACKUP_BUCKET }}/${{ inputs.environment }}/$day/$part.sql" \
+              --file ".wrangler/export/$part.sql" --remote
+          done
+
+      - name: Build
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.SITE_URL }}
+          NEXT_PUBLIC_REFRESH_INTERVAL_MINUTES: ${{ vars.REFRESH_INTERVAL_MINUTES }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          NEXT_PUBLIC_GTM_ID: ${{ vars.GTM_ID }}
+          ROBOTS_ALLOW_INDEXING: ${{ vars.ROBOTS_ALLOW_INDEXING }}
+        run: npm run build
+
+      - name: Deploy
+        id: deploy
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          # Baked into the Worker: production email, Turnstile and phone rules.
+          NODE_ENV: production
+        run: |
+          npx wrangler deploy $ENV_FLAG \
+            --var "GIT_SHA:$GITHUB_SHA" \
+            --var "NEXT_PUBLIC_SITE_URL:$SITE_URL" \
+            --var "ROBOTS_ALLOW_INDEXING:${{ vars.ROBOTS_ALLOW_INDEXING || 'false' }}" \
+            --var "NEXT_PUBLIC_REFRESH_INTERVAL_MINUTES:${{ vars.REFRESH_INTERVAL_MINUTES || '1440' }}" \
+            --message "${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER} ${GITHUB_SHA::12}"
+
+      # GET requests only. Never /go/* or /api/events: they write the clicks
+      # and comparison counts behind the site's public figures.
+      - name: Smoke test
+        id: smoke
+        if: steps.plan.outputs.publish == 'true'
+        run: |
+          commit=""
+          for _ in $(seq 1 24); do
+            commit="$(curl -fsS --max-time 10 "$SITE_URL/api/health" | jq -r '.commit // empty' || true)"
+            [ "$commit" = "$GITHUB_SHA" ] && break
+            sleep 5
+          done
+          [ "$commit" = "$GITHUB_SHA" ] \
+            || { echo "::error::/api/health reports '${commit:-nothing}', expected $GITHUB_SHA"; exit 1; }
+
+          # One server answering with the new commit does not mean all of them
+          # have the new files yet: a first deploy served a 404 for a file it
+          # had just uploaded. So each check gets three tries, 10 seconds
+          # apart, and prints its last answer: the status, then where a
+          # redirect leads.
+          probe() {
+            local answer=""
+            for try in 1 2 3; do
+              answer="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "$SITE_URL$1" || true)"
+              answer="${answer% }"
+              [ "$answer" = "$2" ] && break
+              [ "$try" = 3 ] || sleep 10
+            done
+            echo "$answer $1"
+            [ "$answer" = "$2" ] || { echo "::error::GET $1 answered '$answer', expected '$2'"; return 1; }
+          }
+          fetch() { curl -fsS --max-time 30 --retry 3 --retry-all-errors --retry-delay 5 "$@"; }
+
+          for path in / /compare /compare/uk-to-pakistan /gbp-to-pkr /providers /how-we-rank /sitemap.xml /data/quotes/uk.json; do
+            probe "$path" 200
+          done
+
+          # The data the pages were built from: quotes, not an empty market.
+          quotes="$(fetch "$SITE_URL/data/quotes/uk.json" | jq '.quotes | length')"
+          echo "$quotes UK quotes"
+          [ "$quotes" -gt 0 ] || { echo "::error::the UK data file has no quotes"; exit 1; }
+
+          # Urdu is switched off: /ur must redirect, temporarily, to English.
+          probe /ur "302 $SITE_URL/"
+          # The pre-/compare corridor URLs must keep redirecting permanently.
+          probe /send-money-from-uk-to-pakistan "301 $SITE_URL/compare/uk-to-pakistan"
+
+          # Out of search indexes unless indexing is switched on: a noindex
+          # header on every response and the robots meta tag on pages. Output
+          # is captured before grepping: `curl | grep -q` can fail under
+          # pipefail when grep exits early.
+          if [ "${{ vars.ROBOTS_ALLOW_INDEXING }}" != "true" ]; then
+            head="$(fetch -I "$SITE_URL/")"
+            grep -qi '^x-robots-tag: noindex' <<<"$head" || { echo "::error::home page lost its X-Robots-Tag noindex header"; exit 1; }
+            home="$(fetch "$SITE_URL/")"
+            grep -q 'name="robots" content="noindex' <<<"$home" || { echo "::error::home page lost noindex"; exit 1; }
+          fi
+
+          echo "Deployed \`${GITHUB_SHA::12}\` to $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      # Code and assets only: the database keeps whatever this run wrote, which
+      # expand-only migrations make safe for the previous version to read.
+      - name: Roll back if the smoke test failed
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          echo "::error::Smoke test failed; rolling back to the previous version"
+          if ! out="$(npx wrangler rollback $ENV_FLAG --message "Smoke test failed for ${GITHUB_SHA::12}" --yes 2>&1)"; then
+            echo "$out"
+            # A Worker's first deployment has no earlier version to go back to.
+            if grep -q 'Could not find stable Worker Version' <<<"$out"; then
+              echo "::warning::Nothing to roll back to: this was the Worker's first deployment, so it stays live"
+              exit 0
+            fi
+            exit 1
+          fi
+          echo "$out"
+
+      # This database's share of the free plan's daily D1 allowance, which the
+      # whole Cloudflare account shares.
+      - name: Record D1 usage
+        if: always() && env.D1_DATABASE_ID != ''
+        run: |
+          npx wrangler d1 info DB $ENV_FLAG --json | jq -r '
+            "D1 in the last 24 hours: \(.rows_read_24h) rows read of 5,000,000, "
+            + "\(.rows_written_24h) written of 100,000; \(.database_size / 1048576 * 10 | round / 10) MB stored."
+          ' | tee -a "$GITHUB_STEP_SUMMARY"

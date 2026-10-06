@@ -13,6 +13,7 @@
  * are ones where a precise figure matters and should be confirmed against the
  * primary source before launch rather than taken from this file.
  */
+import { refreshCadence } from '@/lib/cadence'
 import type { SendCurrency } from '@/lib/db/schema'
 
 export interface CorridorSection {
@@ -75,7 +76,7 @@ export const CORRIDOR_CONTENT: Record<SendCurrency, CorridorContent> = {
         'of the most competitive corridors, which is good news if you compare and expensive if you ' +
         'do not. The gap between the best digital service and a high-street bank on a £500 ' +
         'transfer is routinely five figures in rupees.',
-      'Every provider on this page is checked every 15 minutes and ranked by what actually ' +
+      `Every provider on this page is checked ${refreshCadence()} and ranked by what actually ` +
         'arrives in Pakistan after the fee and the exchange rate, not by the rate alone.',
     ],
     sections: [
@@ -122,7 +123,7 @@ export const CORRIDOR_CONTENT: Record<SendCurrency, CorridorContent> = {
     faqs: [
       {
         q: 'Which service delivers the most rupees when sending from the UK to Pakistan?',
-        a: 'Whichever service is at the top of the table above at the moment you look, because it changes. Promotional first-transfer rates mean a provider can lead one week and not the next, which is exactly why the ranking is recomputed every 15 minutes rather than written into the page.',
+        a: `Whichever service is at the top of the table above at the moment you look, because it changes. Promotional first-transfer rates mean a provider can lead one week and not the next, which is exactly why the ranking is recomputed ${refreshCadence()} rather than written into the page.`,
       },
       { q: 'Can I send straight to JazzCash or Easypaisa?', a: WALLET_ANSWER },
       { q: 'What is the State Bank remittance incentive?', a: INCENTIVE_ANSWER },
@@ -151,7 +152,7 @@ export const CORRIDOR_CONTENT: Record<SendCurrency, CorridorContent> = {
           'A branch visit to an exchange house is still often competitive, particularly for cash ' +
             'transfers and for customers who negotiate. Digital services win on convenience and ' +
             'on transparency, and they are what this page can price automatically — a counter ' +
-            'rate cannot be checked every 15 minutes from here.',
+            `rate cannot be checked ${refreshCadence()} from here.`,
           'If you use an exchange house, take the number from this page with you. The useful ' +
             'comparison is not the rate they quote but the rupees your family ends up with after ' +
             'their fee, which is the figure in the table above.',

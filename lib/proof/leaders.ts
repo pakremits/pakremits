@@ -10,9 +10,9 @@
  * every rail and every amount would inflate the number into meaninglessness —
  * a wallet-only reshuffle at 100 GBP is not "the best rate changing hands".
  */
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { corridorLeaders, corridors } from '@/lib/db/schema'
+import { corridorLeaders, corridors, providers } from '@/lib/db/schema'
 import { defaultAmountFor } from '@/lib/corridors'
 import { getComparison } from '@/lib/quotes'
 import { recordBestProviderChange } from './events'
@@ -28,9 +28,13 @@ export async function detectLeaderChanges(): Promise<LeaderChange[]> {
   const changes: LeaderChange[] = []
 
   try {
-    const corridorRows = await db.select().from(corridors).where(eq(corridors.active, true))
-    const existing = await db.select().from(corridorLeaders)
+    const [corridorRows, existing, providerRows] = await Promise.all([
+      db.select().from(corridors).where(eq(corridors.active, true)),
+      db.select().from(corridorLeaders),
+      db.select({ id: providers.id, slug: providers.slug }).from(providers),
+    ])
     const previousByCorridor = new Map(existing.map((row) => [row.corridorId, row.providerId]))
+    const providerIdBySlug = new Map(providerRows.map((row) => [row.slug, row.id]))
 
     for (const corridor of corridorRows) {
       const comparison = await getComparison({
@@ -43,8 +47,8 @@ export async function detectLeaderChanges(): Promise<LeaderChange[]> {
       const winner = comparison?.rows.find((row) => row.isBest)
       if (!winner) continue
 
-      const providerId = await providerIdBySlug(winner.quote.providerSlug)
-      if (providerId === null) continue
+      const providerId = providerIdBySlug.get(winner.quote.providerSlug)
+      if (providerId === undefined) continue
 
       const previous = previousByCorridor.get(corridor.id)
 
@@ -78,11 +82,4 @@ export async function detectLeaderChanges(): Promise<LeaderChange[]> {
   }
 
   return changes
-}
-
-async function providerIdBySlug(slug: string): Promise<number | null> {
-  const rows = (await db.execute(
-    sql`SELECT id FROM providers WHERE slug = ${slug} LIMIT 1`,
-  )) as unknown as { id: number }[]
-  return rows[0]?.id ?? null
 }

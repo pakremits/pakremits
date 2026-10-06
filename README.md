@@ -7,7 +7,8 @@ who pays us.
 **Status: Phases 1–5 complete, with one number short of target.** The rate engine runs against live provider
 APIs and the full public site renders from it — home, 8 corridor pages, 8 rate
 pages, provider and head-to-head pages, method pages, and the static set, in
-English and Urdu. 26 pages prerender.
+English (the Urdu locale is switched off for now). Every page is built ahead of
+time and served as a static file.
 
 Lighthouse mobile is **92** against the brief's target of 95. Desktop is 100
 across all four categories. The gap and what is left to close it are in
@@ -38,7 +39,7 @@ Probing GBP → PKR, bank, 500 GBP
 - robots.txt enforced on every outbound adapter request.
 - Mid-market rates and 30-day history from Wise's public rates endpoints.
 - `computeReceived` and the ranking rules, with 76 unit tests.
-- Cron refresh endpoint plus a GitHub Actions schedule.
+- A daily GitHub Actions run that refreshes the rates and republishes the site.
 - Password-protected manual quote override at `/admin/quotes`.
 - Rate alerts: double opt-in email, WhatsApp/SMS behind a swappable notifier,
   12-hour rate limiting, weekly digest, one-click unsubscribe that deletes.
@@ -50,8 +51,8 @@ Probing GBP → PKR, bank, 500 GBP
 `lib/notify/` falls back to a console notifier whenever credentials are absent,
 so the entire pipeline — evaluation, rate limiting, message composition, trigger
 recording — runs locally and prints the messages it would have sent. Sends are
-marked `simulated`, and a trigger is still recorded, otherwise a local run would
-re-fire the same alert every 15 minutes.
+marked `simulated`, and a trigger is still recorded, otherwise every local
+refresh would re-fire the same alert.
 
 **Alerts trigger on the best rate actually obtainable, not the mid-market rate.**
 Nobody can get the mid-market rate, so an alert firing when it crosses 380 would
@@ -63,39 +64,26 @@ exists for a corridor we do not fall back to mid-market; we simply do not fire.
 
 ## Local setup
 
-Requires Node 20+ (or 22+; Node 23 works but emits engine warnings from eslint).
+Requires Node 22 (CI runs 22.19.0).
 
 ```bash
 git clone <your-repo> pakremits && cd pakremits
 npm install
-cp .env.example .env.local
+cp .env.example .env.local      # optional: keys, and scripts against the real database
+cp .dev.vars.example .dev.vars  # for npm run preview; set a test ADMIN_PASSWORD
 ```
 
-### Supabase
+### Database
 
-The complete schema, migration, seed, and refresh instructions are also
-available in [README-DB.md](./README-DB.md).
-
-1. Create a project at [supabase.com](https://supabase.com) — the free tier is enough.
-2. **Project Settings → Database → Connection string**. Copy two URLs into `.env.local`:
-   - `DATABASE_URL` — the **Transaction** pooler URL (port `6543`). Used at runtime.
-   - `DIRECT_URL` — the **Session** URL (port `5432`). Used only for migrations,
-     because the pooler cannot run DDL transactions reliably.
-3. Apply the schema and the RLS policies:
+The database is Cloudflare D1, which is SQLite. Locally it is a file under
+`.wrangler/state` that wrangler creates and serves, so there is nothing to
+install and no account needed. [README-DB.md](./README-DB.md) covers the schema,
+the D1 limits worth knowing, and running scripts against the real database.
 
 ```bash
-npm run db:migrate
-```
-
-`0001_rls.sql` enables row-level security with no policies, which closes
-Supabase's auto-generated REST API. Without it, the `rate_alerts` table — email
-addresses and phone numbers — would be readable by anyone with the anon key.
-
-### Seed and first refresh
-
-```bash
-npm run seed      # providers, corridors, 30 days of mid-market history
-npm run refresh   # walks the full grid and writes live quotes
+npm run db:migrate:local   # create the local database
+npm run seed               # providers, corridors, 90 days of mid-market history
+npm run refresh            # walks the full grid and writes live quotes
 ```
 
 SadaPay, NayaPay, and Roshan Digital Account remain separate account choices in
@@ -105,17 +93,22 @@ bank-deposit quotes and asks users to confirm account eligibility with the
 provider. Legacy `neobank` and `rda` quote requests also resolve to the `bank`
 rail; no new quote-collection jobs or database migration are needed.
 
-The seed pulls real 30-day history from Wise. If that call fails it writes a
+The seed pulls 90 days of real history from Wise. If that call fails it writes a
 deterministic synthetic walk marked `source: 'synthetic'`, so the charts render
-on a fresh deploy and the fake data is trivially identifiable.
+on a fresh database and the fake data is trivially identifiable.
 
 ### Run it
 
-```bash
-npm run dev
-```
+| Command | What you get |
+| --- | --- |
+| `npm run dev` | The Next dev server at http://localhost:3000 with hot reload, reading the local database. For working on pages: the Worker's routes (`/go`, `/api`, `/alerts`, `/admin`) do not run here. |
+| `npm run build && npm run preview` | The site as it is deployed: the static build and the Worker, through `wrangler dev` at http://127.0.0.1:8787. |
 
-- `/admin/quotes` — HTTP Basic auth, any username, `ADMIN_PASSWORD` as password.
+- `/admin` asks for HTTP Basic auth: any username, and `ADMIN_PASSWORD` from
+  `.dev.vars` as the password.
+- Without `RESEND_API_KEY`, alert emails print to the `wrangler dev` console.
+- A build reads the database once. Rebuild after a refresh to see new quotes on
+  the pages.
 
 ---
 
@@ -123,198 +116,249 @@ npm run dev
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Dev server |
-| `npm test` | Unit tests (compute, ranking, adapter parsers) |
+| `npm run dev` | Next dev server on the local database |
+| `npm run build` | The static site in `out/`, built from the local database |
+| `npm run preview` | Serves `out/` with the Worker (`wrangler dev`, port 8787) |
+| `npm test` | Unit tests, and the database tests on an in-memory D1 |
 | `npm run typecheck` | `next typegen && tsc --noEmit`: route types first, as on a fresh checkout |
 | `npm run probe` | Call every adapter live and print a comparison table |
 | `npm run probe -- --from AED --amount 3000 --method wallet` | Probe one corridor |
 | `npm run probe -- --save` | Re-capture test fixtures from live responses |
-| `npm run refresh` | Full refresh locally, bypassing the HTTP route |
+| `npm run refresh` | Full refresh into the local database |
 | `npm run seed` | Idempotent seed |
 | `npm run db:generate` | Generate a migration from schema changes |
-| `npm run db:migrate` | Apply pending migrations |
-| `npm run db:studio` | Drizzle Studio |
-| `npm run e2e` | Playwright end-to-end suite (needs a seeded database) |
+| `npm run db:migrate:local` | Apply pending migrations to the local database |
+| `npm run db:migrate:remote` | The same against the real database (every publish does this first) |
+| `npm run db:check` | Run each kind of query once and print a summary |
+| `D1_TARGET=remote npm run db:contract` | Check the D1 REST API still behaves as the refresh expects |
+| `npm run e2e` | Playwright end-to-end suite against `npm run preview` ([test/e2e/README.md](./test/e2e/README.md)) |
 | `npm run e2e:ui` | The same, in Playwright's UI mode |
+
+Scripts use the local database unless `D1_TARGET=remote` is set, with the three
+D1 values from `.env.example`.
 
 ### URLs
 
-Public URLs do not match the file router, for two reasons documented in
-`next.config.ts`: Next dynamic segments must be a whole path segment (so
-`compare/[slug]-to-pakistan` is not expressible as a folder), and
-English is served unprefixed while pages live under `/[locale]`. Both are
-handled by explicit rewrites.
+Every public URL is a file in the static build. A folder cannot be a partial
+segment like `[slug]-to-pakistan`, and a static site has no rewrites, so one
+dynamic segment serves each family of pages and picks the template from the
+slug: `app/(site)/compare/[slug]` serves the corridors
+(`/compare/uk-to-pakistan`), the ways to receive (`/compare/jazzcash-transfers`)
+and the head-to-heads (`/compare/remitly-vs-wise`), and `app/(site)/[rate]`
+serves the rate pages (`/gbp-to-pkr`). Each lists its slugs in
+`generateStaticParams`; any other slug is a 404.
 
-**Never link an internal path directly.** `robots.txt` disallows `/corridor/`,
-`/rate/` and `/method/`, so a stray internal link would point search engines at
-a de-indexed URL. Every link goes through `lib/routes.ts`, which takes a locale
-so Urdu pages link to Urdu pages. Adding a page means adding a rewrite line.
+**Never write an internal path by hand.** Every link goes through
+`lib/routes.ts`. Old URLs (`/send-money-…`, `/corridor/…`, `/rate/…`,
+`/method/…`, `/en/…`) redirect permanently through `out/_redirects`, which
+`scripts/write-static-config.ts` writes after each build along with the headers
+in `out/_headers`. Urdu is switched off for now, so `/ur` redirects temporarily
+to the English home page.
 
 ---
 
-## Deploying to Fly.io
+## Deploying to Cloudflare
 
-The `Dockerfile` and both Fly configs are committed. `fly.staging.toml` is the
-staging app, `pakremits-staging` at https://stage.pakremits.com; `fly.toml`
-describes a production app, `pakremits`, that has not been created on Fly yet.
-The image compiles with `next build --experimental-build-mode compile`, which
-needs no database, and `docker-entrypoint.mjs` prerenders the pages when the
-container boots, once Fly has injected `DATABASE_URL`.
+Everything runs on Cloudflare's free plan:
 
-Server-only values are Fly secrets: `DATABASE_URL`, `CRON_SECRET` and
-`ADMIN_PASSWORD`, plus whichever notification secrets from `.env.example` you use.
-
-```bash
-fly secrets set -a pakremits-staging DATABASE_URL="postgresql://..." CRON_SECRET="..." ADMIN_PASSWORD="..."
+```
+Visitor ─► Worker + static assets (Workers Free)
+  ├─ static files, free and unlimited: every page, /data/quotes/*.json for the
+  │    comparison panel, OG images, sitemap.xml, robots.txt
+  └─ /go/*  /api/*  /alerts/*  /admin*  ─► worker/index.ts ─► D1
 ```
 
-`NEXT_PUBLIC_*` values are compiled into the browser bundle, so they go in the
-config's `[build.args]` as well as `[env]`, never in secrets. Do not commit
-secrets to either TOML file.
+- **Pages are built, not rendered on request.** The free plan allows 10 ms of
+  CPU per request, too little to render a Next.js page. Rates only change when
+  the refresh runs, so the whole site is built from the database as static
+  files (`output: 'export'`) right after each refresh and deployed with the
+  Worker. Page views never reach the Worker or the database.
+- **The Worker** (`worker/`) handles only what needs a server: affiliate
+  redirects, alert sign-up and email links, the comparison beacon, the health
+  check, and the admin. Each request is a few D1 queries and no rendering.
+- **The comparison panel** loads `/data/quotes/{corridor}.json` and ranks in the
+  browser with the same `lib/ranking/` code the build uses.
+- **The refresh** runs on GitHub Actions, which has the Chromium the browser
+  adapters need and time for a full pass, and writes to D1 over its REST API.
 
-The HTTP health check deliberately uses `/`, not `/api/health`: the server only
-starts listening once the boot-time prerender has finished, so a passing `/`
-means the release can serve pages. Keep one Machine, because Next's filesystem
-cache and tag invalidation are local to each Machine.
+### Environments
 
-After the first deploy of a new app, set the GitHub Actions repository variable
-`SITE_URL` to its public address. The scheduled refresh updates PostgreSQL
-directly and then asks that address to revalidate its cached quote pages.
+Staging is the Worker `pakremits-staging` at https://stage.pakremits.com, with
+the D1 database `pakremits-staging`. It is published from `main` through the
+GitHub environment `staging`, and is the top level of `wrangler.jsonc`.
 
-### Continuous deployment
+Production (`pakremits.com`) will be its own Worker and database: a
+`production` env in `wrangler.jsonc` and a GitHub environment of the same name,
+which `publish.yml` pairs up, with `ROBOTS_ALLOW_INDEXING=true` and a faster
+refresh.
 
-`.github/workflows/ci.yml` runs on every pull request into `main` and every push
-to `main`:
+### The pipeline
 
-| Job | Runs on | What it does |
+| Workflow | Runs on | What it does |
 | --- | --- | --- |
-| `verify` | PRs and pushes | Typecheck, lint, unit tests, and the same compile-mode build the image runs |
-| `migrations` | PRs and pushes | Applies every migration to an empty Postgres, then checks a second run applies nothing |
-| `deploy-staging` | Pushes to `main` that pass both | Deploys `pakremits-staging`, smoke-tests it, and rolls back if that fails |
+| `ci.yml` | PRs into `main`, pushes to `main` | `verify`: typecheck, lint, tests, a full static build on a seeded local database, and the Worker's bundle. `migrations`: applies every migration to an empty database, checks a second run applies nothing, and fails if `lib/db/schema.ts` has a change with no migration. On `main`, once both pass and the commit is still `main`'s tip, it publishes staging with the rates already in the database. |
+| `daily.yml` | 05:07 and 11:07 UTC, or by hand | Refreshes the rates and publishes. The first tick each day does the work; the second only runs if the first did not, since GitHub's scheduler can drop a run. By hand, `force` refreshes even if one ran recently and `deploy_only` republishes without a refresh, which is what the admin's **Publish now** runs. |
+| `publish.yml` | Called by both | The one way a release goes live, below. |
 
-These are the only type and lint gates before a deploy: the compile-mode build
-skips type checking, and Next 16's build no longer runs ESLint.
+`publish.yml` runs one release at a time per environment, queued and never
+cancelled halfway:
 
-The deploy job:
-
-1. **Deploys only the tip of `main`.** Deploys queue one at a time, and a run
-   whose commit is no longer the tip skips, so a slow or re-run job never
-   downgrades staging.
-2. **Migrates first.** Fly runs `node scripts/migrate.mjs` as the release
-   command, in a one-off Machine with the app's own secrets, before any Machine
-   is replaced. Pending migrations apply in one transaction; a failure stops the
-   deploy with the old release still serving.
-3. **Switches blue-green.** The new Machine boots beside the old one and only
-   takes traffic once its health check passes, so the boot-time prerender is not
-   downtime, and a release that fails to boot never serves.
-4. **Smoke-tests the result.** It waits for `/api/health` to report the new
-   commit (the image carries it as `GIT_SHA`), checks the main pages return 200,
-   and checks staging still refuses indexing. It sends GET requests only and
-   never touches `/go/*` or `/api/quotes`, which record the clicks and
-   comparisons behind the public proof figures.
-5. **Rolls back** to the image that was serving if the smoke test fails. The job
+1. **Migrates.** Applies pending migrations to the database `wrangler.jsonc`
+   binds as `DB`.
+2. **Refreshes**, if asked and unless the last refresh is recent. An empty
+   database is seeded first. Before writing anything it checks that the D1
+   REST API still behaves as `lib/db/d1-http.ts` expects
+   (`npm run db:contract`).
+3. **Copies the database.** Exports D1 into a local copy for the build, and
+   backs the export up to a private R2 bucket. Never to an Actions artifact:
+   the repository is public and `rate_alerts` holds email addresses.
+4. **Builds** the site from that copy: no API calls, and one consistent
+   snapshot for every page.
+5. **Deploys** the Worker and the site with `wrangler deploy`.
+6. **Smoke-tests** the result. It waits for `/api/health` to report the new
+   commit, checks the main pages and a data file return 200 with quotes in it,
+   that `/ur` and an old URL redirect, and that staging still refuses indexing.
+   It sends GET requests only and never touches `/go/*` or `/api/events`, which
+   record the clicks and comparisons behind the public figures.
+7. **Rolls back** with `wrangler rollback` if the smoke test fails. The job
    still fails, so someone looks.
+8. **Records D1 usage** for the last 24 hours in the run's summary, against the
+   free plan's daily allowance. The allowance is per Cloudflare account, so
+   other projects on the same account count against it too.
 
 **Migrations must keep working with the release that is still serving**,
-because they run before the switch and a rollback does not reverse them. Add
-columns and tables before code uses them; remove them in a later release. Do not
-run `npm run db:migrate` by hand during a deploy: the migrator takes no lock.
+because they run before the deploy and a rollback does not reverse them. Add
+columns and tables before code uses them; remove them in a later release.
 
-#### One-time setup
+### Refresh cadence
 
-The deploy uses an app-scoped Fly token that only `main` can read:
+`REFRESH_INTERVAL_MINUTES`, a variable on each GitHub environment, is how often
+the rates are refreshed: 1440, once a day, unless set. Everything that depends
+on it reads that one value:
 
-1. Create it with
-   `fly tokens create deploy -a pakremits-staging -n "GitHub Actions staging deploy" -x 8760h`
-   and copy the whole output, including the `FlyV1 ` prefix.
-2. On GitHub, as the repository owner: **Settings → Environments → New
-   environment** `staging`. Under deployment branches choose *Selected branches*
-   and add `main`, then add the environment secret `FLY_DEPLOY_TOKEN`. The
-   repository secret `FLY_API_TOKEN` is the refresh workflow's database tunnel
-   and cannot deploy; leave it alone.
-3. Recommended: a branch ruleset on `main` requiring a pull request and the
+- the copy, such as "checked once a day";
+- the stale badge: a quote older than 1.5 intervals shows as out of date,
+  judged by the reader's clock, so a page built yesterday never claims to be
+  fresh;
+- the admin's late-refresh banner;
+- `publish.yml`'s skip gate, which refreshes only once five sixths of an
+  interval have passed since the last refresh.
+
+Staging refreshes once a day, which keeps D1 well inside its free daily write
+allowance. Production will start at three a day (480, with a schedule tick
+every 8 hours and spares). Revisit both at about 1,000 users a month.
+
+### One-time setup
+
+Done by the Cloudflare account's owner. Workers Free is enough.
+
+1. **Create the database.** From the project folder:
+
+   ```bash
+   npx wrangler login
+   npx wrangler d1 create pakremits-staging --location weur
+   ```
+
+   Put the `database_id` it prints into both D1 entries in `wrangler.jsonc`
+   and commit it; it is not a secret. A new id also starts a fresh local
+   database, so run `npm run db:migrate:local` and `npm run seed` again.
+
+2. **Optionally, a backup bucket.** Cloudflare asks for a payment method before
+   it enables R2, even within the free allowance. Without a bucket, D1 Time
+   Travel (7 days on the free plan) is the only backup.
+
+   ```bash
+   npx wrangler r2 bucket create pakremits-backups
+   npx wrangler r2 bucket lifecycle add pakremits-backups expire-backups --expire-days 30
+   ```
+
+3. **A Cloudflare API token** for the deploys: **My Profile → API Tokens →
+   Create Token**. Start from the *Edit Cloudflare Workers* template and make
+   sure it has **Workers Scripts: Edit**, **D1: Edit**, **Workers Routes:
+   Edit** on the site's zone (to attach its custom domain) and, for backups,
+   **Workers R2 Storage: Edit**, limited to your account. A second, D1-only
+   token for the refresh is optional (`CLOUDFLARE_D1_TOKEN`).
+
+4. **The GitHub environment** (**Settings → Environments**): `staging`, with
+   deployments limited to `main`. It needs:
+
+   | Kind | Name | Value |
+   | --- | --- | --- |
+   | Secret | `CLOUDFLARE_API_TOKEN` | The token above |
+   | Secret | `CLOUDFLARE_D1_TOKEN` | Optional D1-only token for the refresh |
+   | Secret | `RESEND_API_KEY` | Sends the rate alerts and digests the refresh triggers |
+   | Variable | `CLOUDFLARE_ACCOUNT_ID` | The account's id |
+   | Variable | `SITE_URL` | `https://stage.pakremits.com`, the custom domain in `wrangler.jsonc` |
+   | Variable | `REFRESH_INTERVAL_MINUTES` | `1440` |
+   | Variable | `TURNSTILE_SITE_KEY` | The public key of a Turnstile widget that lists this site's hostname |
+   | Variable | `GTM_ID` | `GTM-N4ZV897G` on staging; unset for none |
+   | Variable | `BACKUP_BUCKET` | `pakremits-backups`; unset for no backups |
+   | Variable | `ROBOTS_ALLOW_INDEXING` | Unset (false) everywhere but production |
+   | Variable | `BHEJO_DISABLED_ADAPTERS` | Optional; see [Adding a provider adapter](#adding-a-provider-adapter) |
+
+   A repository-level secret or variable with one of these names applies to
+   every environment that does not set its own, so set `SITE_URL` on each
+   environment explicitly.
+
+5. **The address.** The hostname is the custom domain in `wrangler.jsonc`
+   (`routes`), which every deploy attaches along with its DNS record and
+   certificate. Cloudflare will not take over a hostname that already has a
+   DNS record, so delete any record for it before the first publish.
+
+6. **Worker secrets**, once the first publish has created the Worker:
+
+   ```bash
+   npx wrangler secret put ADMIN_PASSWORD
+   npx wrangler secret put RESEND_API_KEY
+   npx wrangler secret put TURNSTILE_SECRET_KEY
+   npx wrangler secret put GITHUB_DISPATCH_TOKEN
+   ```
+
+   `GITHUB_DISPATCH_TOKEN` is for the admin's **Publish now**: a fine-grained
+   GitHub token for this repository only, with **Actions: Read and write**.
+
+7. **Recommended:** a branch ruleset on `main` requiring a pull request and the
    `verify` and `migrations` checks, with force pushes blocked. Never add path
    filters to `ci.yml`: a required check that never runs blocks the PR.
 
-The token expires after a year. Replace the secret, then remove the old token
-with `fly tokens list -a pakremits-staging` and `fly tokens revoke <id>`.
+### By hand
 
-#### Deploying or rolling back by hand
-
-```bash
-fly deploy -c fly.staging.toml --build-arg GIT_SHA=$(git rev-parse HEAD)
-fly releases -a pakremits-staging --image
-fly deploy -c fly.staging.toml --image <image ref> --skip-release-command
-```
-
-Pass `--skip-release-command` when redeploying an older image: its migrations
-are already applied, and images built before the pipeline have no
-`scripts/migrate.mjs`.
+- **Publish now:** **Actions → Daily → Run workflow**, with `deploy_only` to
+  skip the refresh or `force` to refresh even if one ran recently.
+- **Roll back the code:** `npx wrangler deployments list`, then
+  `npx wrangler rollback <version-id>`; with no id it goes back one version.
+  The database stays as it is.
+- **Restore the database:** D1 Time Travel restores to any point in the last 7
+  days on the free plan, for example
+  `npx wrangler d1 time-travel restore pakremits-staging --timestamp 2026-10-06T05:00:00Z`.
+  Older states are in the R2 backups, one export a day under
+  `<environment>/<date>/`: apply `schema.sql` to an empty database, then
+  `data.sql`. Publish afterwards, since the pages are built from the database.
 
 ### Staging and production URLs, sitemap, and crawling
 
-`fly.staging.toml` sets `NEXT_PUBLIC_SITE_URL=https://stage.pakremits.com`
-both at build time and at runtime. Canonical links, Open Graph URLs, alert
-confirmation links, redirects, and `/sitemap.xml` all use that value. For the
-production Fly app, set it to `https://pakremits.com` in **both** `[build.args]`
-and `[env]`, then redeploy; `NEXT_PUBLIC_*` values are compiled into the site.
-Also change the GitHub Actions repository variable `SITE_URL` to the production
-URL when the scheduled job should revalidate production pages.
+`SITE_URL` on each GitHub environment is the site's address. The build bakes
+it into canonical links, Open Graph URLs and `/sitemap.xml`, and the deploy
+hands it to the Worker for alert email links. To move a site to another
+address, change `SITE_URL` and publish.
 
-Staging sets `ROBOTS_ALLOW_INDEXING=false` at build and runtime. Its
-`/robots.txt` says
-`User-agent: *` and `Disallow: /`, and pages emit `noindex`. The sitemap remains
-available for inspection but is not advertised in staging robots.txt. At
-production launch, set `ROBOTS_ALLOW_INDEXING=true` in **both** `[build.args]`
-and `[env]` on the production app, redeploy, and verify `/robots.txt`,
-`/sitemap.xml`, page canonicals, and alert email links use `pakremits.com`.
-Configure a separate production
-Turnstile widget for the root domain before switching traffic. The sitemap
-lists canonical public pages; private alert/admin/API URLs and internal rewrite
-targets are intentionally excluded. Robots directives guide cooperative
-crawlers; they do not password-protect staging.
+Staging leaves `ROBOTS_ALLOW_INDEXING` unset, which means false: every response
+carries an `X-Robots-Tag: noindex` header (from `out/_headers`) and every page
+a robots `noindex` meta tag. `robots.txt` allows crawling on purpose, because a
+crawler that is disallowed never fetches the page and so never sees the
+noindex; only the sitemap is withheld. At production launch, set
+`ROBOTS_ALLOW_INDEXING=true` on the production environment, publish, and verify
+`/robots.txt`, `/sitemap.xml`, page canonicals, and alert email links use
+`pakremits.com`. Configure a separate production Turnstile widget for the root
+domain before switching traffic. The sitemap lists canonical public pages;
+alert, admin and API URLs are intentionally excluded. Robots directives guide
+cooperative crawlers; they do not password-protect staging.
 
-Public pages load the Google Tag Manager container configured by
-`NEXT_PUBLIC_GTM_ID` using Next.js's `GoogleTagManager` integration, with a
-`noscript` fallback. The staging config uses `GTM-N4ZV897G`. Set the same
-variable in both build args and runtime env for the production Fly app and
-redeploy. Admin and private alert-management pages do not load GTM, so their
-URLs and alert tokens are not sent to the container. Review the tags enabled in
-GTM and the privacy notice before publishing new tracking tags.
-
-## Deploying to Vercel
-
-1. Push to GitHub, import the repo at [vercel.com/new](https://vercel.com/new).
-2. Add every variable from `.env.example` under **Settings → Environment Variables**.
-3. Deploy.
-
-### The cron is not on Vercel
-
-Vercel's Hobby plan **caps cron jobs at once per day** and rejects any more
-frequent expression at deploy time
-([docs](https://vercel.com/docs/cron-jobs/usage-and-pricing)). A 15-minute
-refresh therefore runs from GitHub Actions, which provides Chromium for the
-Western Union browser adapter.
-
-The job also does not call the site over HTTP. A full refresh across the grid
-takes about four minutes with polite per-host throttling, well past the 60s
-function limit, so `.github/workflows/refresh-rates.yml` runs `npm run refresh`
-directly against the database and then pings `/api/cron/revalidate` to drop the
-cached pages. It first runs `npm run providers:sync`, so newly collected
-providers exist in the database before quotes are written.
-`/api/cron/refresh-rates` still exists for manual triggering.
-
-In your GitHub repo:
-
-- **Settings → Secrets and variables → Actions → Secrets**: add `DATABASE_URL`
-  (the pooled Supabase URL) and `CRON_SECRET`, matching the value on the deployed app.
-- **→ Variables**: add `SITE_URL`, e.g. `https://pakremits.fly.dev`. Leave it
-  unset before the first deploy and the revalidate step skips itself.
-
-Trigger the workflow by hand from the Actions tab to check it before waiting for
-a tick. It runs at 7, 22, 37, and 52 minutes past each hour (UTC), avoiding the
-top-of-hour load peak. GitHub's scheduler is best-effort and can still lag,
-which is why `/admin` surfaces the last successful run.
+Public pages load the Google Tag Manager container in `GTM_ID` through Next.js's
+`GoogleTagManager` integration, with a `noscript` fallback. Admin and private
+alert-management pages do not load GTM, so their URLs and alert tokens are not
+sent to the container. Review the tags enabled in GTM and the privacy notice
+before publishing new tracking tags.
 
 ---
 
@@ -322,7 +366,7 @@ which is why `/admin` surfaces the last successful run.
 
 | Item | State |
 | --- | --- |
-| Timestamp on every quote, stale badge past 60 minutes | done — asserted in e2e |
+| Timestamp on every quote, stale badge past 1.5 refresh intervals | done — asserted in e2e |
 | Affiliate disclosure in the footer and beside provider links | done — asserted in e2e |
 | Privacy policy covering alert data; deletion on unsubscribe | done — unsubscribe deletes the row |
 | Keyboard navigable, visible focus | done — driven with real keys in `test/e2e/accessibility.spec.ts` |
@@ -331,7 +375,7 @@ which is why `/admin` surfaces the last successful run.
 | Fonts self-hosted via `next/font` | done |
 | Unit tests for `computeReceived` and each adapter parser | done — 190 unit tests |
 | One Playwright e2e for the home comparison flow | done — 18 specs × 2 form factors |
-| Seed script with providers, corridors and 30 days of history | done |
+| Seed script with providers, corridors and 90 days of history | done |
 | README a stranger can deploy from | done |
 | Lighthouse mobile ≥ 95 | **92** — see below |
 | Providers: 14 in the brief | **7 live** — see [Provider access](#provider-access-as-verified-on-19-sep-2026) |
@@ -407,12 +451,12 @@ Two things measured and rejected, recorded so they are not retried:
 ### Measuring it yourself
 
 ```bash
-npm run build && npm start
-npx lighthouse http://localhost:3000/ --chrome-flags="--headless=new" --view
+npm run build && npm run preview
+npx lighthouse http://127.0.0.1:8787/ --chrome-flags="--headless=new" --view
 ```
 
-`next start` gzips both HTML and static assets, so a local number is comparable
-to a deployed one. Vercel adds brotli, worth a few percent more.
+For the numbers that count, point Lighthouse at the deployed site: Cloudflare's
+edge compresses and caches in ways a local server does not.
 
 ---
 
@@ -427,10 +471,15 @@ password):
 | `/admin/providers` | Affiliate templates and the sponsored placement |
 | `/admin/quotes` | Manual quote overrides |
 
+Edits save to the database straight away but reach the public pages at the
+next publish, because the pages are static: the daily run, or **Publish now**
+in the admin header, which runs `daily.yml` without a refresh and is live in a
+few minutes.
+
 The dashboard's loudest signal is the banner that appears when no refresh has
-run in 45 minutes. It is worth trusting: the schedule is GitHub's, which is
-best-effort and does stop, and nothing else on the site would tell you — a
-stale quote still renders a number.
+run for 1.5 refresh intervals (36 hours on staging). It is worth trusting: the
+schedule is GitHub's, which is best-effort and does stop, and nothing else on
+the site would tell you — a stale quote still renders a number.
 
 ### Setting an affiliate template
 
@@ -482,11 +531,12 @@ change.
 Then `npm run probe` to see it live, and `npm run seed` to create its row.
 
 For a provider with no JSON endpoint, set `runtime: 'browser'` and put the
-adapter in `lib/providers/browser/`. Those are skipped on Vercel and only run in
-the GitHub Actions job, which sets `BHEJO_ALLOW_BROWSER=1`.
+adapter in `lib/providers/browser/`. Those only run in the GitHub Actions
+refresh, which sets `BHEJO_ALLOW_BROWSER=1`.
 
-If a provider asks us to stop, add its slug to `BHEJO_DISABLED_ADAPTERS` — it
-leaves the rotation immediately with no deploy.
+If a provider asks us to stop, add its slug to the `BHEJO_DISABLED_ADAPTERS`
+variable on the GitHub environments — it leaves the rotation at the next
+refresh, with no code change.
 
 ---
 
@@ -639,8 +689,11 @@ lib/
     compute.ts      computeReceived and friends. Pure, no I/O.
     rank.ts         sort order and sponsored placement. No commission input.
   fx/               mid-market sources behind one interface
-  db/               Drizzle schema and a lazily-connected client
+  db/               Drizzle schema (SQLite) and the D1 binding the Worker,
+                    scripts and build share
   corridors.ts      the eight corridors as static config
+worker/             /go, /api, /alerts and /admin: the only code that runs
+                    per request
 ```
 
 Two rules hold the thing together:
@@ -671,32 +724,18 @@ value against a fee-deducted one silently favours the former.
 ## Alert form bot protection and email
 
 The alert signup uses Cloudflare Turnstile in Managed mode. Create a widget for
-the site's hostname, set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` at build and runtime, and keep
-`TURNSTILE_SECRET_KEY` as a server-side secret. Both are required in production;
-signup fails closed if verification is missing or invalid. For local development,
+the site's hostname, set its site key as the `TURNSTILE_SITE_KEY` variable on the
+GitHub environment (the build puts it in the pages), and its secret as the Worker
+secret `TURNSTILE_SECRET_KEY`. Both are required in production; signup fails
+closed if verification is missing or invalid. For local development,
 Cloudflare's official test keys are used automatically when these variables are
 unset. Use a separate real widget for staging and production.
 
 Confirmation, rate alert, and weekly digest emails share a branded HTML template
-and include matching plain-text content. Set `RESEND_API_KEY`, `RESEND_FROM`, and
-`NEXT_PUBLIC_SITE_URL`; verify the sender domain's SPF, DKIM, and DMARC records
-with your email provider. Rate alerts and digests include one-click unsubscribe
-headers. These practices support deliverability, but inbox placement cannot be
+and include matching plain-text content. The Worker sends confirmations and the
+refresh sends alerts and digests, so `RESEND_API_KEY` is both a Worker secret
+and a GitHub environment secret; `RESEND_FROM` is set in `wrangler.jsonc` and
+`publish.yml`. Verify the sender domain's SPF, DKIM, and DMARC records with your
+email provider. Rate alerts and digests include one-click unsubscribe headers.
+These practices support deliverability, but inbox placement cannot be
 guaranteed.
-
----
-
-## Local Postgres without Supabase
-
-For development you can skip Supabase entirely:
-
-```bash
-docker run -d --name pakremits-pg -e POSTGRES_PASSWORD=pakremits -e POSTGRES_DB=pakremits \
-  -p 55432:5432 postgres:16-alpine
-```
-
-Then set both URLs in `.env.local` to
-`postgresql://postgres:pakremits@localhost:55432/pakremits` and run `npm run db:migrate`,
-`npm run seed`, `npm run refresh`. The RLS migration is guarded on role
-existence, so it applies cleanly against a plain Postgres that has no `anon` or
-`authenticated` roles.

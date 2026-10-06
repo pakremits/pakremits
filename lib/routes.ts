@@ -1,10 +1,9 @@
 /**
  * Public URL builders.
  *
- * Every internal link goes through here. The internal paths (/corridor/[slug],
- * /rate/[currency], /method/[slug]) are implementation details behind rewrites
- * and must never be linked directly — robots.txt disallows them, so a stray
- * internal link would point search engines at a de-indexed URL.
+ * Every internal link goes through here. Each URL is a file in the static
+ * build, so a hand-written path that drifts from these builders is a 404. The
+ * old internal paths (/corridor/…, /rate/…, /method/…) only redirect now.
  *
  * All builders take a locale so Urdu pages link to Urdu pages.
  */
@@ -14,7 +13,7 @@ import { type Locale, localePath } from '@/i18n/routing'
  * Every comparison page lives under /compare: corridors, payout rails and the
  * provider head-to-heads. PakRemits compares; it does not send money, so the
  * URLs say "compare" rather than "send money". The old /send-money-… URLs
- * 301 here (next.config.ts).
+ * 301 here (out/_redirects, written by scripts/write-static-config.ts).
  */
 export function corridorPath(slug: string, locale: Locale = 'en'): string {
   return localePath(locale, `/compare/${slug}-to-pakistan`)

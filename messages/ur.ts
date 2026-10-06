@@ -127,7 +127,7 @@ export const ur: Messages = {
 
     providersTitle: 'جن سروسز کا ہم موازنہ کرتے ہیں',
     providersLede:
-      '{count} سروسز، ہر {minutes} منٹ بعد چیک کی جاتی ہیں۔ فیس، رفتار اور وصولی کے طریقے ' +
+      '{count} سروسز، {cadence} چیک کی جاتی ہیں۔ فیس، رفتار اور وصولی کے طریقے ' +
       'دیکھنے کے لیے کسی ایک کو کھولیں۔',
     providersAll: 'دیکھیں ہر سروس کیا سپورٹ کرتی ہے',
 
@@ -168,7 +168,7 @@ export const ur: Messages = {
     // TODO: native review
     trustRefreshTitle: 'تازگی واضح ہے',
     // TODO: native review
-    trustRefreshBody: 'دن بھر تازہ ہونے والے ریٹس کے ساتھ مارکیٹ پر نظر رکھیں۔',
+    trustRefreshBody: 'سائٹ کا ہر ریٹ {cadence} چیک ہوتا ہے، اور ساتھ اس کا وقت لکھا ہوتا ہے۔',
     // TODO: native review
     trustRankingValue: 'وصول شدہ PKR',
     // TODO: native review
@@ -206,7 +206,7 @@ export const ur: Messages = {
     faq1Q: 'کیا دکھایا گیا ریٹ وہی ہے جو مجھے ملے گا؟',
     // TODO: native review
     faq1A:
-      'یہ اس وقت کا لائیو ریٹ ہے جو صفحے پر درج ہے، اور ہر 15 منٹ بعد اپ ڈیٹ ہوتا ہے۔ ' +
+      'یہ اس وقت کا ریٹ ہے جو صفحے پر درج ہے، اور {cadence} اپ ڈیٹ ہوتا ہے۔ ' +
       'ادائیگی سے پہلے متعلقہ سروس اپنی ویب سائٹ پر حتمی ریٹ کی تصدیق کرتی ہے، اور اس دوران ' +
       'ریٹ تھوڑا بدل سکتا ہے۔ اسی لیے ہم ہر ریٹ کے ساتھ وقت لکھتے ہیں۔',
     // TODO: native review
@@ -246,7 +246,7 @@ export const ur: Messages = {
     alertsTitle: 'جب پاؤنڈ <rate>{rateValue}</rate> پر پہنچے تو مجھے بتائیں',
     // TODO: native review
     alertsBody:
-      'اپنا مطلوبہ ریٹ منتخب کریں۔ ہم ہر 15 منٹ بعد مارکیٹ دیکھتے ہیں اور جیسے ہی ریٹ اس حد ' +
+      'اپنا مطلوبہ ریٹ منتخب کریں۔ ہم {cadence} مارکیٹ دیکھتے ہیں اور جیسے ہی ریٹ اس حد ' +
       'کو پار کرے، اس وقت کی بہترین سروس کے ساتھ آپ کو پیغام بھیج دیتے ہیں۔',
     // TODO: native review
     alertsComingSoon:
@@ -260,7 +260,7 @@ export const ur: Messages = {
     // TODO: native review — every string in this namespace
     pakistanOnly: 'صرف پاکستان کے کوریڈورز کے لیے بنایا گیا۔',
     // TODO: native review
-    providersRefreshed: '{providers} سروسز کا موازنہ، ہر {minutes} منٹ بعد تازہ۔',
+    providersRefreshed: '{providers} سروسز کا موازنہ، {cadence} تازہ۔',
     // TODO: native review
     liveGap: '{sendAmount} پر عام بینک کے مقابلے میں اس وقت {amount} زیادہ۔',
     // TODO: native review
@@ -324,7 +324,7 @@ export const ur: Messages = {
     dialogTitle: 'جب ریٹ میرے ہدف پر پہنچے تو مجھے بتائیں',
     // TODO: native review
     dialogBody:
-      'ہم ہر 15 منٹ بعد مارکیٹ دیکھتے ہیں اور ریٹ ہدف پار کرتے ہی آپ کو اس وقت کی بہترین سروس کے ساتھ ای میل کرتے ہیں۔',
+      'ہم {cadence} مارکیٹ دیکھتے ہیں اور ریٹ ہدف پار کرتے ہی آپ کو اس وقت کی بہترین سروس کے ساتھ ای میل کرتے ہیں۔',
     previewSender: 'PakRemits alerts',
     // TODO: native review
     previewLine: '<strong>{pair} نے {rate} پار کر لیا</strong>۔ کون یہ ریٹ دے رہا ہے، دیکھنے کے لیے PakRemits کھولیں۔',
@@ -334,7 +334,7 @@ export const ur: Messages = {
     unavailable: 'الرٹ عارضی طور پر دستیاب نہیں۔',
     // TODO: native review
     ctaBody:
-      'اپنا مطلوبہ ریٹ چنیں۔ ہم ہر 15 منٹ میں مارکیٹ دیکھتے ہیں اور جیسے ہی ریٹ وہاں پہنچے، اس وقت کے بہترین ادارے کے ساتھ آپ کو ای میل کرتے ہیں۔',
+      'اپنا مطلوبہ ریٹ چنیں۔ ہم {cadence} مارکیٹ دیکھتے ہیں اور جیسے ہی ریٹ وہاں پہنچے، اس وقت کے بہترین ادارے کے ساتھ آپ کو ای میل کرتے ہیں۔',
   },
 
   panel: {

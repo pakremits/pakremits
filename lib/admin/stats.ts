@@ -10,7 +10,7 @@
  * rather than throwing. A dashboard that 500s because one panel failed tells
  * you nothing about the other five.
  */
-import { desc, sql } from 'drizzle-orm'
+import { desc, gte, sql } from 'drizzle-orm'
 import { db, toNum } from '@/lib/db'
 import {
   affiliateClicks,
@@ -19,7 +19,16 @@ import {
   providers,
   rateAlerts,
   rateQuotes,
+  siteStatsDaily,
 } from '@/lib/db/schema'
+import { utcDaysBack } from '@/lib/proof/events'
+
+const DAY_MS = 86_400_000
+
+/** Epoch milliseconds `days` days before now: the lower bound of a window. */
+function msAgo(days: number): number {
+  return Date.now() - days * DAY_MS
+}
 
 export interface ClicksByDay {
   day: string
@@ -31,21 +40,19 @@ export interface ClicksByDay {
 /** Clicks grouped by day, provider and corridor — the revenue picture. */
 export async function clicksByDay(days = 14): Promise<ClicksByDay[]> {
   try {
-    const rows = (await db.execute(sql`
+    return await db.all<ClicksByDay>(sql`
       SELECT
-        to_char(date_trunc('day', ${affiliateClicks.createdAt}), 'YYYY-MM-DD') AS day,
+        date(${affiliateClicks.createdAt} / 1000, 'unixepoch') AS day,
         ${providers.name} AS provider,
         ${corridors.fromCountryName} AS corridor,
-        count(*)::int AS clicks
+        count(*) AS clicks
       FROM ${affiliateClicks}
       INNER JOIN ${providers} ON ${providers.id} = ${affiliateClicks.providerId}
       LEFT JOIN ${corridors} ON ${corridors.id} = ${affiliateClicks.corridorId}
-      WHERE ${affiliateClicks.createdAt} > now() - make_interval(days => ${days})
-      GROUP BY 1, 2, 3
-      ORDER BY 1 DESC, 4 DESC
-    `)) as unknown as ClicksByDay[]
-
-    return rows
+      WHERE ${affiliateClicks.createdAt} > ${msAgo(days)}
+      GROUP BY day, provider, corridor
+      ORDER BY day DESC, clicks DESC
+    `)
   } catch (error) {
     console.error('[admin] clicksByDay failed:', error)
     return []
@@ -61,14 +68,16 @@ export interface ClickTotals {
 
 export async function clickTotals(): Promise<ClickTotals> {
   try {
-    const [row] = (await db.execute(sql`
+    const now = new Date()
+    const startOfToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+    const row = await db.get<ClickTotals | undefined>(sql`
       SELECT
-        count(*) FILTER (WHERE ${affiliateClicks.createdAt} >= date_trunc('day', now()))::int AS today,
-        count(*) FILTER (WHERE ${affiliateClicks.createdAt} > now() - interval '7 days')::int  AS last7,
-        count(*) FILTER (WHERE ${affiliateClicks.createdAt} > now() - interval '30 days')::int AS last30,
-        count(*)::int AS "allTime"
+        count(*) FILTER (WHERE ${affiliateClicks.createdAt} >= ${startOfToday}) AS today,
+        count(*) FILTER (WHERE ${affiliateClicks.createdAt} > ${msAgo(7)})       AS last7,
+        count(*) FILTER (WHERE ${affiliateClicks.createdAt} > ${msAgo(30)})      AS last30,
+        count(*) AS "allTime"
       FROM ${affiliateClicks}
-    `)) as unknown as ClickTotals[]
+    `)
 
     return row ?? { today: 0, last7: 0, last30: 0, allTime: 0 }
   } catch (error) {
@@ -151,36 +160,46 @@ export interface AdapterHealth {
  * the public site by design — a stale row still shows a number. This is where
  * it surfaces.
  */
-export async function adapterHealth(): Promise<AdapterHealth[]> {
+export async function adapterHealth(windowHours = 24): Promise<AdapterHealth[]> {
   try {
-    const rows = (await db.execute(sql`
+    // The window is aggregated once and then joined, so the history is read
+    // once rather than once per provider.
+    const rows = await db.all<{
+      provider: string
+      slug: string
+      lastCapture: number | null
+      staleRows: number
+      freshRows: number
+      sources: string | null
+    }>(sql`
       SELECT
-        ${providers.name} AS provider,
-        ${providers.slug} AS slug,
-        max(${rateQuotes.capturedAt}) AS "lastCapture",
-        count(*) FILTER (WHERE ${rateQuotes.stale})::int      AS "staleRows",
-        count(*) FILTER (WHERE NOT ${rateQuotes.stale})::int  AS "freshRows",
-        -- FILTER, not a JS-side filter: without it the aggregate over a
-        -- provider with no rows returns {NULL}, which rendered literally as
-        -- "NULL" in the Source column.
-        coalesce(
-          array_agg(DISTINCT ${rateQuotes.source})
-            FILTER (WHERE ${rateQuotes.source} IS NOT NULL),
-          '{}'
-        )                                                     AS sources
-      FROM ${providers}
-      LEFT JOIN ${rateQuotes}
-        ON ${rateQuotes.providerId} = ${providers.id}
-       AND ${rateQuotes.capturedAt} > now() - interval '24 hours'
-      WHERE ${providers.active} AND NOT ${providers.isBenchmark}
-      GROUP BY 1, 2
-      ORDER BY 1
-    `)) as unknown as (Omit<AdapterHealth, 'lastCapture'> & { lastCapture: string | null })[]
+        p.name AS provider,
+        p.slug AS slug,
+        q.last_capture AS "lastCapture",
+        coalesce(q.stale_rows, 0) AS "staleRows",
+        coalesce(q.fresh_rows, 0) AS "freshRows",
+        q.sources AS sources
+      FROM ${providers} AS p
+      LEFT JOIN (
+        SELECT
+          provider_id,
+          max(captured_at) AS last_capture,
+          sum(stale) AS stale_rows,
+          sum(1 - stale) AS fresh_rows,
+          group_concat(DISTINCT source) AS sources
+        FROM ${rateQuotes}
+        WHERE captured_at > ${Date.now() - windowHours * 3_600_000}
+        GROUP BY provider_id
+      ) AS q ON q.provider_id = p.id
+      WHERE p.active = 1 AND p.is_benchmark = 0
+      ORDER BY p.name
+    `)
 
     return rows.map((row) => ({
       ...row,
-      lastCapture: row.lastCapture ? new Date(row.lastCapture) : null,
-      sources: (row.sources ?? []).filter(Boolean),
+      lastCapture: row.lastCapture === null ? null : new Date(row.lastCapture),
+      // group_concat gives null for a provider with no rows in the window.
+      sources: row.sources ? row.sources.split(',') : [],
     }))
   } catch (error) {
     console.error('[admin] adapterHealth failed:', error)
@@ -225,19 +244,20 @@ export async function providerSettings() {
 /** Clicks per provider that would earn commission versus those that cannot. */
 export async function monetisationGap() {
   try {
-    const rows = (await db.execute(sql`
+    const rows = await db.all<{ provider: string; monetised: number; clicks: number }>(sql`
       SELECT
         ${providers.name} AS provider,
         ${providers.affiliateUrlTemplate} IS NOT NULL AS monetised,
-        count(${affiliateClicks.id})::int AS clicks
+        count(${affiliateClicks.id}) AS clicks
       FROM ${providers}
       LEFT JOIN ${affiliateClicks} ON ${affiliateClicks.providerId} = ${providers.id}
-      WHERE ${providers.active} AND NOT ${providers.isBenchmark}
-      GROUP BY 1, 2
-      ORDER BY 3 DESC
-    `)) as unknown as { provider: string; monetised: boolean; clicks: number }[]
+      WHERE ${providers.active} = 1 AND ${providers.isBenchmark} = 0
+      GROUP BY ${providers.id}
+      ORDER BY clicks DESC
+    `)
 
-    return rows
+    // SQLite has no boolean type: IS NOT NULL comes back as 0 or 1.
+    return rows.map((row) => ({ ...row, monetised: row.monetised === 1 }))
   } catch (error) {
     console.error('[admin] monetisationGap failed:', error)
     return []
@@ -262,23 +282,23 @@ export interface ProofDay {
  */
 export async function proofByDay(days = 30): Promise<ProofDay[]> {
   try {
-    const rows = (await db.execute(sql`
-      SELECT
-        d.day::text                            AS date,
-        coalesce(s.comparisons_run, 0)         AS "comparisonsRun",
-        coalesce(s.clicks, 0)                  AS clicks,
-        coalesce(s.saving_pkr_total, 0)::float AS "savingPkrTotal",
-        coalesce(s.best_provider_changes, 0)   AS "bestProviderChanges"
-      FROM generate_series(
-             (current_date - make_interval(days => ${days}))::date,
-             current_date,
-             interval '1 day'
-           ) AS d(day)
-      LEFT JOIN site_stats_daily s ON s.date = d.day::text
-      ORDER BY 1
-    `)) as unknown as ProofDay[]
+    const dates = utcDaysBack(days)
+    const rows = await db
+      .select()
+      .from(siteStatsDaily)
+      .where(gte(siteStatsDaily.date, dates[0]))
+    const byDate = new Map(rows.map((row) => [row.date, row]))
 
-    return rows
+    return dates.map((date) => {
+      const row = byDate.get(date)
+      return {
+        date,
+        comparisonsRun: row?.comparisonsRun ?? 0,
+        clicks: row?.clicks ?? 0,
+        savingPkrTotal: toNum(row?.savingPkrTotal),
+        bestProviderChanges: row?.bestProviderChanges ?? 0,
+      }
+    })
   } catch (error) {
     console.error('[admin] proofByDay failed:', error)
     return []

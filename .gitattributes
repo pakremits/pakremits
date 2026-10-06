@@ -1,5 +1,3 @@
-# Linux entrypoints and container configuration must retain LF endings when
-# contributors check out the repository on Windows.
-docker-entrypoint.mjs text eol=lf
-Dockerfile text eol=lf
+# Shell scripts must keep LF endings when contributors check out the
+# repository on Windows.
 *.sh text eol=lf

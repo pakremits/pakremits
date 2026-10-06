@@ -67,17 +67,22 @@ export const wiseFxSource: FxSource = {
   },
 
   async getHistory(from, days) {
-    const url =
-      `https://wise.com/rates/history+live?source=${from}&target=PKR` +
-      `&length=${days}&resolution=daily&unit=day`
+    // The day unit stops at 31 (a longer length is a 400); months reach a
+    // year, so a longer span is asked for in months and trimmed to `days`.
+    const byMonth = days > 31
+    const span = byMonth
+      ? `length=${Math.min(Math.ceil(days / 30), 12)}&resolution=daily&unit=month`
+      : `length=${days}&resolution=daily&unit=day`
+    const url = `https://wise.com/rates/history+live?source=${from}&target=PKR&${span}`
     const points = await fetchJson<WiseRatePoint[]>(url, { providerSlug: 'fx:wise' })
 
     if (!Array.isArray(points) || points.length === 0) {
       throw new AdapterError('fx:wise', `no history for ${from}`)
     }
 
+    const cutoff = byMonth ? Date.now() - days * 86_400_000 : -Infinity
     return points
-      .filter((p) => Number.isFinite(p.value) && p.value > 0)
+      .filter((p) => Number.isFinite(p.value) && p.value > 0 && p.time >= cutoff)
       .map((p) => ({ date: new Date(p.time), rate: p.value }))
       .sort((a, b) => a.date.getTime() - b.date.getTime())
   },

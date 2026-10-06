@@ -1,10 +1,10 @@
 /**
- * The admin password check, shared by proxy.ts (every /admin request) and the
- * admin server actions (a second check inside each action).
+ * The admin password check, made by the Worker for every /admin page and
+ * /admin/api request (worker/admin.ts).
  *
  * HTTP Basic auth against a single ADMIN_PASSWORD; the username is ignored.
  * Fails closed when ADMIN_PASSWORD is unset. Uses only Web APIs (atob,
- * TextEncoder), so it runs in the Edge-runtime proxy as well as in Node.
+ * TextEncoder), with a hand-rolled constant-time compare.
  */
 
 /** Constant-time string compare that does not leak length via early exit. */

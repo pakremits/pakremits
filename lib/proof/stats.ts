@@ -6,10 +6,12 @@
  * that only real activity writes to. When there is no data the field is 0 or
  * null and the claim that depends on it does not render.
  */
-import { and, eq, gte, isNotNull, sql } from 'drizzle-orm'
+import { and, count, eq, gte, isNotNull, sql, sum } from 'drizzle-orm'
 import { db, toNum } from '@/lib/db'
-import { providers, savingsLedger } from '@/lib/db/schema'
-import { LAUNCH_DATE, PROOF_CACHE_MS, REFRESH_MINUTES } from './config'
+import { providers, savingsLedger, siteStatsDaily } from '@/lib/db/schema'
+import { REFRESH_INTERVAL_MINUTES } from '@/lib/cadence'
+import { IN_STATIC_BUILD } from '@/lib/build-phase'
+import { LAUNCH_DATE, PROOF_CACHE_MS } from './config'
 
 export interface ProofStats {
   savingsSinceLaunch: number
@@ -30,19 +32,14 @@ const EMPTY: ProofStats = {
   comparisonsThisMonth: 0,
   bestProviderChangesThisMonth: 0,
   providersCompared: 0,
-  refreshMinutes: REFRESH_MINUTES,
+  refreshMinutes: REFRESH_INTERVAL_MINUTES,
   unavailable: true,
   computedAt: new Date(0),
 }
 
 /**
- * Five-minute memo, per server instance.
- *
- * Deliberately not `unstable_cache` (replaced in Next 16) and not `use cache`
- * (which needs the project-wide `cacheComponents` flag, changing rendering
- * semantics for every existing page). A module-level TTL gives exactly the
- * bounded staleness the brief asks for, works the same in the ISR pages and the
- * dynamic admin, and couples to nothing.
+ * Five-minute memo, per process: the static build renders several pages that
+ * show these figures, and they need only one read.
  */
 let cached: { value: ProofStats; expires: number } | null = null
 
@@ -51,13 +48,7 @@ function monthStart(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
 }
 
-/**
- * `YYYY-MM-DD`, for comparing against `site_stats_daily.date` — a text column.
- *
- * Passing a Date straight into a raw `sql` template fails: postgres.js binds
- * parameters itself and throws ERR_INVALID_ARG_TYPE on a Date in a position it
- * cannot infer. The Drizzle query builder converts it, `db.execute` does not.
- */
+/** `YYYY-MM-DD`, for comparing against `site_stats_daily.date` — a text column. */
 function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
@@ -72,35 +63,35 @@ export async function getProofStats(options?: { fresh?: boolean }): Promise<Proo
       // Since launch. `saving_pkr IS NOT NULL` drops clicks in corridors that
       // had no benchmark, which is the whole reason the column is nullable.
       db
-        .select({ total: sql<string | null>`sum(${savingsLedger.savingPkr})` })
+        .select({ total: sum(savingsLedger.savingPkr) })
         .from(savingsLedger)
         .where(
           and(isNotNull(savingsLedger.savingPkr), gte(savingsLedger.createdAt, LAUNCH_DATE)),
         ),
 
       db
-        .select({ total: sql<string | null>`sum(${savingsLedger.savingPkr})` })
+        .select({ total: sum(savingsLedger.savingPkr) })
         .from(savingsLedger)
         .where(and(isNotNull(savingsLedger.savingPkr), gte(savingsLedger.createdAt, since))),
 
       // Comparisons and leader changes come from the daily rollup rather than
       // the raw event table: the rollup is what /admin charts, and reading the
       // same source keeps the hero and the dashboard from disagreeing.
-      db.execute(sql`
-        SELECT
-          coalesce(sum(comparisons_run), 0)::int      AS comparisons,
-          coalesce(sum(best_provider_changes), 0)::int AS changes
-        FROM site_stats_daily
-        WHERE date >= ${isoDay(since)}
-      `),
+      db
+        .select({
+          comparisons: sql<number>`coalesce(sum(${siteStatsDaily.comparisonsRun}), 0)`,
+          changes: sql<number>`coalesce(sum(${siteStatsDaily.bestProviderChanges}), 0)`,
+        })
+        .from(siteStatsDaily)
+        .where(gte(siteStatsDaily.date, isoDay(since))),
 
       db
-        .select({ n: sql<number>`count(*)::int` })
+        .select({ n: count() })
         .from(providers)
         .where(and(eq(providers.active, true), eq(providers.isBenchmark, false))),
     ])
 
-    const counters = (monthCounters as unknown as { comparisons: number; changes: number }[])[0]
+    const counters = monthCounters[0]
 
     const value: ProofStats = {
       savingsSinceLaunch: toNum(savings[0]?.total ?? 0),
@@ -108,22 +99,25 @@ export async function getProofStats(options?: { fresh?: boolean }): Promise<Proo
       comparisonsThisMonth: counters?.comparisons ?? 0,
       bestProviderChangesThisMonth: counters?.changes ?? 0,
       providersCompared: providerCount[0]?.n ?? 0,
-      refreshMinutes: REFRESH_MINUTES,
+      refreshMinutes: REFRESH_INTERVAL_MINUTES,
       computedAt: new Date(),
     }
 
     cached = { value, expires: Date.now() + PROOF_CACHE_MS }
     return value
   } catch (error) {
-    // A dead database must not take the home page with it. Every claim is
-    // threshold-gated on these numbers, and zeroes hide all of them — which is
-    // the correct failure mode: show no proof rather than a wrong one.
+    // In the static build a failed read fails the build: zeroes would hide
+    // every claim until the next deploy.
+    if (IN_STATIC_BUILD) throw error
+    // Elsewhere a dead database must not take the caller with it. Every claim
+    // is threshold-gated on these numbers, and zeroes hide all of them — which
+    // is the correct failure mode: show no proof rather than a wrong one.
     console.error('[proof] getProofStats failed:', error)
     return EMPTY
   }
 }
 
-/** Drop the memo. Called by /api/cron/revalidate so a refresh shows through. */
+/** Drop the memo, so a refresh in the same process shows through. */
 export function invalidateProofStats(): void {
   cached = null
 }

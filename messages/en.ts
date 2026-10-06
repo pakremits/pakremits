@@ -77,8 +77,8 @@ export const en = {
 
     providersTitle: 'The services we compare',
     providersLede:
-      '{count} services, each checked every {minutes} minutes. Open one to see its fees, speed ' +
-      'and payout options.',
+      '{count} services, each checked {cadence}. Open one to see its fees, speed and payout ' +
+      'options.',
     providersAll: 'See what each service supports',
 
     payoutTitle: 'How will they receive it?',
@@ -109,7 +109,7 @@ export const en = {
     trustRouteBody: 'Compare bank, mobile wallet, cash pickup and RDA options in one place.',
     trustRefreshValue: 'Ready when you are',
     trustRefreshTitle: 'Freshness you can see',
-    trustRefreshBody: 'Keep an eye on the market with rates updated throughout the day.',
+    trustRefreshBody: 'Every rate on the site is checked {cadence}, with the time it was captured.',
     trustRankingValue: 'PKR received',
     trustRankingTitle: 'One fair ranking rule',
     trustRankingBody: 'We combine the exchange rate and fee, then rank by what reaches the recipient.',
@@ -133,9 +133,9 @@ export const en = {
 
     faq1Q: 'Is the rate shown the rate I will actually get?',
     faq1A:
-      'It is the provider’s live quote at the time shown on the page, refreshed every 15 ' +
-      'minutes. The provider confirms the final rate on their site before you pay, and it can ' +
-      'move slightly in between. That is why we show a timestamp on every quote.',
+      'It is the provider’s quote at the time shown on the page, checked {cadence}. The ' +
+      'provider confirms the final rate on their site before you pay, and it can move in ' +
+      'between. That is why we show a timestamp on every quote.',
     faq2Q: 'How does PakRemits make money?',
     faq2A:
       'Some providers pay us a fixed commission when a new customer signs up through our link. ' +
@@ -163,8 +163,8 @@ export const en = {
 
     alertsTitle: 'Tell me when the pound hits <rate>{rateValue}</rate>',
     alertsBody:
-      'Pick a target rate. We watch the market every 15 minutes and message you the moment it ' +
-      'crosses, with the best provider at that moment.',
+      'Pick a target rate. We check the market {cadence} and message you when it crosses, ' +
+      'with the best provider at that moment.',
     alertsComingSoon:
       'Rate alerts open shortly. They will send one message per alert, at most once every 12 ' +
       'hours, with one-tap unsubscribe.',
@@ -174,8 +174,7 @@ export const en = {
   proof: {
     // Day-one claims. True from the first deploy, no threshold attached.
     pakistanOnly: 'Built only for Pakistan corridors.',
-    providersRefreshed:
-      '{providers} providers compared, refreshed every {minutes} minutes.',
+    providersRefreshed: '{providers} providers compared, refreshed {cadence}.',
     liveGap: '{amount} more on {sendAmount} than a typical bank, right now.',
     rankedByRupees: 'Ranked by rupees received. Never by who pays us.',
 
@@ -217,7 +216,7 @@ export const en = {
       'that moment. At most once every 12 hours.',
     dialogTitle: 'Tell me when the rate hits my target',
     dialogBody:
-      'We watch the market every 15 minutes and email you the moment it crosses, with the best ' +
+      'We check the market {cadence} and email you when it crosses your target, with the best ' +
       'provider at that moment.',
     previewSender: 'PakRemits alerts',
     // <strong> wraps the headline of the sample message.
@@ -225,8 +224,8 @@ export const en = {
     close: 'Close',
     unavailable: 'Alerts are temporarily unavailable.',
     ctaBody:
-      'Pick a target rate. We watch the market every 15 minutes and email you the moment it ' +
-      'crosses, with the best provider at that moment.',
+      'Pick a target rate. We check the market {cadence} and email you when it crosses, with ' +
+      'the best provider at that moment.',
   },
 
   panel: {
