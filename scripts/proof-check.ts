@@ -5,12 +5,13 @@
  * then after scripts/seed-proof-demo.ts, and compare.
  */
 import '../lib/load-env'
-import { db } from '../lib/db'
+import { connectNodeD1 } from '../lib/db/node'
 import { evaluateClaims } from '../lib/proof/claims'
 import { formatProofPkrFull } from '../lib/proof/format'
 import { getProofStats } from '../lib/proof/stats'
 
 async function main() {
+  const d1 = await connectNodeD1()
   const stats = await getProofStats({ fresh: true })
 
   console.log('savingsSinceLaunch      ', formatProofPkrFull(stats.savingsSinceLaunch))
@@ -25,7 +26,7 @@ async function main() {
     console.log(`${claim.visible ? 'SHOWN ' : 'hidden'}  ${claim.id.padEnd(24)} ${claim.reason}`)
   }
 
-  await db.$client.end()
+  await d1.close()
 }
 
 main().catch((error) => {

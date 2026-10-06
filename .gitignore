@@ -48,3 +48,7 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# wrangler (local D1 state, build output)
+.wrangler/
+.dev.vars*

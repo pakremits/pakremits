@@ -1,9 +1,10 @@
 /**
  * Comparison-run events, and the daily rollup that feeds the admin chart.
  */
-import { sql } from 'drizzle-orm'
-import { db } from '@/lib/db'
-import { comparisonEvents } from '@/lib/db/schema'
+import { type AnyColumn, and, count, gte, isNotNull, lt, sql, sum } from 'drizzle-orm'
+import { db, runBatch, toMoney, toNum } from '@/lib/db'
+import { rowsChanged } from '@/lib/db/d1'
+import { affiliateClicks, comparisonEvents, savingsLedger, siteStatsDaily } from '@/lib/db/schema'
 
 /** Name of the opaque session cookie. No personal data, no cross-site value. */
 export const SESSION_COOKIE = 'prq_sid'
@@ -18,7 +19,7 @@ const EVENT_RETENTION_DAYS = 45
  * not a read-then-write. Someone dragging the amount slider fires several
  * requests within the same second; two of them racing would both pass a
  * "have we seen this session this minute?" SELECT and insert twice. Letting
- * Postgres enforce it is the only version that is actually correct under
+ * the database enforce it is the only version that is actually correct under
  * concurrency, and it is one round trip instead of two.
  */
 export async function recordComparisonRun(
@@ -41,6 +42,24 @@ export async function recordComparisonRun(
   }
 }
 
+const DAY_MS = 86_400_000
+
+/** `YYYY-MM-DD` in UTC, the format of `site_stats_daily.date`. */
+export function utcDay(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+/** The UTC days from `days` days ago up to today, oldest first. */
+export function utcDaysBack(days: number, now = new Date()): string[] {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  return Array.from({ length: days + 1 }, (_, i) => utcDay(new Date(today - (days - i) * DAY_MS)))
+}
+
+/** The UTC calendar day of an epoch-milliseconds column. */
+function dayOf(column: AnyColumn) {
+  return sql<string>`date(${column} / 1000, 'unixepoch')`
+}
+
 /**
  * Rebuild `site_stats_daily` for the last `days` days.
  *
@@ -52,38 +71,59 @@ export async function recordComparisonRun(
  */
 export async function rollUpSiteStats(days = 3): Promise<number> {
   try {
-    const result = await db.execute(sql`
-      INSERT INTO site_stats_daily (date, comparisons_run, clicks, saving_pkr_total, best_provider_changes)
-      SELECT
-        d.day::text,
-        coalesce(c.n, 0),
-        coalesce(k.n, 0),
-        coalesce(s.total, 0),
-        0
-      FROM generate_series(
-             (current_date - make_interval(days => ${days}))::date,
-             current_date,
-             interval '1 day'
-           ) AS d(day)
-      LEFT JOIN (
-        SELECT date_trunc('day', created_at)::date AS day, count(*)::int AS n
-        FROM comparison_events GROUP BY 1
-      ) c ON c.day = d.day
-      LEFT JOIN (
-        SELECT date_trunc('day', created_at)::date AS day, count(*)::int AS n
-        FROM affiliate_clicks GROUP BY 1
-      ) k ON k.day = d.day
-      LEFT JOIN (
-        SELECT date_trunc('day', created_at)::date AS day, sum(saving_pkr) AS total
-        FROM savings_ledger WHERE saving_pkr IS NOT NULL GROUP BY 1
-      ) s ON s.day = d.day
-      ON CONFLICT (date) DO UPDATE SET
-        comparisons_run  = excluded.comparisons_run,
-        clicks           = excluded.clicks,
-        saving_pkr_total = excluded.saving_pkr_total
-    `)
+    const dates = utcDaysBack(days)
+    const since = new Date(`${dates[0]}T00:00:00Z`)
 
-    return Array.isArray(result) ? result.length : days + 1
+    const eventDay = dayOf(comparisonEvents.createdAt)
+    const clickDay = dayOf(affiliateClicks.createdAt)
+    const savingDay = dayOf(savingsLedger.createdAt)
+
+    const [events, clicks, savings] = await Promise.all([
+      db
+        .select({ day: eventDay, n: count() })
+        .from(comparisonEvents)
+        .where(gte(comparisonEvents.createdAt, since))
+        .groupBy(eventDay),
+      db
+        .select({ day: clickDay, n: count() })
+        .from(affiliateClicks)
+        .where(gte(affiliateClicks.createdAt, since))
+        .groupBy(clickDay),
+      db
+        .select({ day: savingDay, total: sum(savingsLedger.savingPkr) })
+        .from(savingsLedger)
+        .where(and(gte(savingsLedger.createdAt, since), isNotNull(savingsLedger.savingPkr)))
+        .groupBy(savingDay),
+    ])
+
+    const byDay = <T extends { day: string }>(rows: T[]) => new Map(rows.map((row) => [row.day, row]))
+    const eventsByDay = byDay(events)
+    const clicksByDay = byDay(clicks)
+    const savingsByDay = byDay(savings)
+
+    await runBatch(
+      dates.map((date) => {
+        const row = {
+          date,
+          comparisonsRun: eventsByDay.get(date)?.n ?? 0,
+          clicks: clicksByDay.get(date)?.n ?? 0,
+          savingPkrTotal: toMoney(toNum(savingsByDay.get(date)?.total)),
+        }
+        return db
+          .insert(siteStatsDaily)
+          .values({ ...row, bestProviderChanges: 0 })
+          .onConflictDoUpdate({
+            target: siteStatsDaily.date,
+            set: {
+              comparisonsRun: row.comparisonsRun,
+              clicks: row.clicks,
+              savingPkrTotal: row.savingPkrTotal,
+            },
+          })
+      }),
+    )
+
+    return dates.length
   } catch (error) {
     console.error('[proof] rollUpSiteStats failed:', error)
     return 0
@@ -91,16 +131,19 @@ export async function rollUpSiteStats(days = 3): Promise<number> {
 }
 
 /** Count a change of top-ranked provider against today's row. */
-export async function recordBestProviderChange(count = 1): Promise<void> {
-  if (count <= 0) return
+export async function recordBestProviderChange(changes = 1): Promise<void> {
+  if (changes <= 0) return
 
   try {
-    await db.execute(sql`
-      INSERT INTO site_stats_daily (date, best_provider_changes)
-      VALUES (current_date::text, ${count})
-      ON CONFLICT (date) DO UPDATE SET
-        best_provider_changes = site_stats_daily.best_provider_changes + ${count}
-    `)
+    await db
+      .insert(siteStatsDaily)
+      .values({ date: utcDay(new Date()), bestProviderChanges: changes })
+      .onConflictDoUpdate({
+        target: siteStatsDaily.date,
+        set: {
+          bestProviderChanges: sql`${siteStatsDaily.bestProviderChanges} + excluded.best_provider_changes`,
+        },
+      })
   } catch (error) {
     console.error('[proof] recordBestProviderChange failed:', error)
   }
@@ -109,12 +152,12 @@ export async function recordBestProviderChange(count = 1): Promise<void> {
 /** Drop comparison events the rollup has already absorbed. */
 export async function pruneComparisonEvents(days = EVENT_RETENTION_DAYS): Promise<number> {
   try {
-    const deleted = await db
+    const result = await db
       .delete(comparisonEvents)
-      .where(sql`${comparisonEvents.createdAt} < now() - make_interval(days => ${days})`)
-      .returning({ id: comparisonEvents.id })
+      .where(lt(comparisonEvents.createdAt, new Date(Date.now() - days * DAY_MS)))
+      .run()
 
-    return deleted.length
+    return rowsChanged(result)
   } catch (error) {
     console.error('[proof] pruneComparisonEvents failed:', error)
     return 0

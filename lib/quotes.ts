@@ -11,9 +11,9 @@ import {
   type DeliveryMethod,
   type SendCurrency,
   corridors,
+  latestQuotes,
   midMarketRates,
   providers,
-  rateQuotes,
 } from '@/lib/db/schema'
 import {
   CURRENCY_SYMBOLS,
@@ -178,9 +178,9 @@ const STALE_AFTER_MS = 60 * 60 * 1000
 /**
  * The comparison table for one corridor, method, and amount.
  *
- * Uses Postgres `DISTINCT ON` to take only the newest quote per provider, which
- * is far cheaper than a window function over a table that grows by ~4,000 rows a
- * day.
+ * Reads `latest_quotes`, which holds exactly the newest quote per provider for
+ * each slot, so this is a primary-key range read of a dozen rows rather than a
+ * search through weeks of history.
  */
 export async function getComparison(options: {
   corridorSlug: string
@@ -230,57 +230,39 @@ export async function getComparison(options: {
   const amount = options.amount ?? (currency === 'GBP' ? 500 : STANDARD_AMOUNTS[currency][1])
   const quotedAtAmount = nearestStandardAmount(currency, amount)
 
-  /**
-   * `DISTINCT ON (provider_id)` takes only the newest quote per provider inside
-   * Postgres. The alternative — fetching every quote for the slot and reducing
-   * in JS — would pull weeks of history to keep a handful of rows, since this
-   * table grows by thousands of rows a day.
-   */
-  const rows = (await safeRead(`getComparison(${corridorSlug}) quotes`, null, () =>
-    db.execute(sql`
-    SELECT DISTINCT ON (${rateQuotes.providerId})
-      ${providers.slug}                 AS provider_slug,
-      ${providers.name}                 AS provider_name,
-      ${providers.brandColor}           AS brand_color,
-      ${providers.brandTextColor}       AS brand_text_color,
-      ${providers.featured}             AS featured,
-      ${providers.isBenchmark}          AS is_benchmark,
-      ${providers.affiliateUrlTemplate} AS affiliate_url_template,
-      ${rateQuotes.rate}                AS rate,
-      ${rateQuotes.fee}                 AS fee,
-      ${rateQuotes.deliverySpeedText}   AS delivery_speed_text,
-      ${rateQuotes.deliverySpeedMinutes} AS delivery_speed_minutes,
-      ${rateQuotes.promoFlag}           AS promo_flag,
-      ${rateQuotes.promoNote}           AS promo_note,
-      ${rateQuotes.source}              AS source,
-      ${rateQuotes.stale}               AS stale,
-      ${rateQuotes.capturedAt}          AS captured_at
-    FROM ${rateQuotes}
-    INNER JOIN ${providers} ON ${rateQuotes.providerId} = ${providers.id}
-    WHERE ${rateQuotes.corridorId} = ${corridor.id}
-      AND ${rateQuotes.deliveryMethod} = ${method}
-      AND ${rateQuotes.amountSent} = ${String(quotedAtAmount)}
-      AND ${providers.active} = true
-    ORDER BY ${rateQuotes.providerId}, ${rateQuotes.capturedAt} DESC
-  `),
-  )) as unknown as null | {
-    provider_slug: string
-    provider_name: string
-    brand_color: string
-    brand_text_color: string
-    featured: boolean
-    is_benchmark: boolean
-    affiliate_url_template: string | null
-    rate: string
-    fee: string
-    delivery_speed_text: string
-    delivery_speed_minutes: number | null
-    promo_flag: boolean
-    promo_note: string | null
-    source: string
-    stale: boolean
-    captured_at: Date
-  }[]
+  const rows = await safeRead(`getComparison(${corridorSlug}) quotes`, null, () =>
+    db
+      .select({
+        providerSlug: providers.slug,
+        providerName: providers.name,
+        brandColor: providers.brandColor,
+        brandTextColor: providers.brandTextColor,
+        featured: providers.featured,
+        isBenchmark: providers.isBenchmark,
+        affiliateUrlTemplate: providers.affiliateUrlTemplate,
+        rate: latestQuotes.rate,
+        fee: latestQuotes.fee,
+        deliverySpeedText: latestQuotes.deliverySpeedText,
+        deliverySpeedMinutes: latestQuotes.deliverySpeedMinutes,
+        promoFlag: latestQuotes.promoFlag,
+        promoNote: latestQuotes.promoNote,
+        source: latestQuotes.source,
+        stale: latestQuotes.stale,
+        capturedAt: latestQuotes.capturedAt,
+      })
+      .from(latestQuotes)
+      .innerJoin(providers, eq(latestQuotes.providerId, providers.id))
+      .where(
+        and(
+          eq(latestQuotes.corridorId, corridor.id),
+          eq(latestQuotes.deliveryMethod, method),
+          eq(latestQuotes.amountSent, quotedAtAmount),
+          eq(providers.active, true),
+        ),
+      )
+      // A fixed order, so ranking ties break the same way on every read.
+      .orderBy(latestQuotes.providerId),
+  )
 
   if (rows === null) return outage()
 
@@ -295,31 +277,31 @@ export async function getComparison(options: {
 
   const comparisonRows: ComparisonRow[] = rows
     // The stored benchmark provider is replaced by a live-computed row below.
-    .filter((row) => !row.is_benchmark)
+    .filter((row) => !row.isBenchmark)
     .map((row) => {
       const rate = toNum(row.rate)
       const fee = toNum(row.fee)
       return {
-        providerSlug: row.provider_slug,
-        providerName: row.provider_name,
-        brandColor: row.brand_color,
-        brandTextColor: row.brand_text_color,
+        providerSlug: row.providerSlug,
+        providerName: row.providerName,
+        brandColor: row.brandColor,
+        brandTextColor: row.brandTextColor,
         rate,
         fee,
         // Recomputed for the requested amount rather than reusing the stored
         // figure, which was calculated at `quotedAtAmount`.
         amountReceived: computeReceived(amount, rate, fee),
-        deliverySpeedText: row.delivery_speed_text,
-        deliverySpeedMinutes: row.delivery_speed_minutes,
-        promo: row.promo_flag,
-        promoNote: row.promo_note,
+        deliverySpeedText: row.deliverySpeedText,
+        deliverySpeedMinutes: row.deliverySpeedMinutes,
+        promo: row.promoFlag,
+        promoNote: row.promoNote,
         deliveryMethod: method,
         source: row.source,
         stale: row.stale,
-        capturedAt: new Date(row.captured_at),
+        capturedAt: row.capturedAt,
         featured: row.featured,
         isBenchmark: false,
-        hasAffiliateLink: Boolean(row.affiliate_url_template),
+        hasAffiliateLink: Boolean(row.affiliateUrlTemplate),
       }
     })
 
@@ -361,36 +343,39 @@ export interface RateSeries {
 }
 
 /**
- * Daily mid-market series for the hero ticker and the corridor-page charts.
+ * Daily mid-market series for the hero ticker and the corridor-page charts:
+ * the last reading of each UTC day.
  *
- * Collapses to one point per day — the cron writes a row every 15 minutes, and
- * a 30-day sparkline wants 30 points, not 2,880.
+ * Counted back from this currency's newest reading, not from now: if the
+ * refresh stalls, a "7-day" series must still cover the 7 days before the
+ * "refreshed at" time the page shows, not shrink to the one or two readings
+ * left inside a window that runs to today.
  */
 export async function getMidMarketSeries(
   currency: SendCurrency,
   days = 7,
 ): Promise<RateSeries> {
-  const rows = (await safeRead(`getMidMarketSeries(${currency})`, [], () =>
-    db.execute(sql`
-      SELECT DISTINCT ON (day)
-        date_trunc('day', ${midMarketRates.capturedAt}) AS day,
+  // SQLite fills a bare column in a max() query from the row holding the
+  // maximum, so `rate` here is the day's last reading.
+  const rows = await safeRead(`getMidMarketSeries(${currency})`, [], () =>
+    db.all<{ day: string; at: number; rate: number }>(sql`
+      SELECT
+        date(${midMarketRates.capturedAt} / 1000, 'unixepoch') AS day,
+        max(${midMarketRates.capturedAt}) AS at,
         ${midMarketRates.rate} AS rate
       FROM ${midMarketRates}
       WHERE ${midMarketRates.fromCurrency} = ${currency}
-        -- Counted back from this currency's newest reading, not from now: if
-        -- the refresh stalls, a "7-day" series must still cover the 7 days
-        -- before the "refreshed at" time the page shows, not shrink to the
-        -- one or two readings left inside a window that runs to today.
         AND ${midMarketRates.capturedAt} > (
           SELECT max(latest.captured_at) FROM ${midMarketRates} AS latest
           WHERE latest.from_currency = ${currency}
-        ) - make_interval(days => ${days})
-      ORDER BY day, ${midMarketRates.capturedAt} DESC
+        ) - ${days * 86_400_000}
+      GROUP BY day
+      ORDER BY day
     `),
-  )) as unknown as { day: Date; rate: string }[]
+  )
 
   const points = rows
-    .map((row) => ({ date: new Date(row.day), rate: toNum(row.rate) }))
+    .map((row) => ({ date: new Date(`${row.day}T00:00:00Z`), rate: toNum(row.rate) }))
     .sort((a, b) => a.date.getTime() - b.date.getTime())
 
   const first = points.at(0)?.rate ?? null
@@ -429,7 +414,7 @@ export async function getMidMarketHistory(currency: SendCurrency, days = 90): Pr
   const [series, rows] = await Promise.all([
     getMidMarketSeries(currency, days),
     safeRead(`getMidMarketHistory(${currency})`, [], () =>
-      db.execute(sql`
+      db.all<{ at: number; rate: number }>(sql`
         SELECT ${midMarketRates.capturedAt} AS at, ${midMarketRates.rate} AS rate
         FROM ${midMarketRates}
         WHERE ${midMarketRates.fromCurrency} = ${currency}
@@ -437,10 +422,10 @@ export async function getMidMarketHistory(currency: SendCurrency, days = 90): Pr
           AND ${midMarketRates.capturedAt} > (
             SELECT max(latest.captured_at) FROM ${midMarketRates} AS latest
             WHERE latest.from_currency = ${currency}
-          ) - interval '24 hours'
+          ) - ${86_400_000}
         ORDER BY ${midMarketRates.capturedAt}
       `),
-    ) as unknown as Promise<{ at: Date | string; rate: string }[]>,
+    ),
   ])
 
   return {

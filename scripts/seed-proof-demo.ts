@@ -5,9 +5,9 @@
  * the day-one lines, and after 1,000 comparison events and ₨ 30 lakh of ledger
  * savings the month and savings lines appear on their own.
  *
- * It refuses to run against a database that looks like production, because
- * writing fake rows into the savings ledger would corrupt the one number on the
- * site that is supposed to be beyond question.
+ * It refuses to run against the remote database, because writing fake rows
+ * into the savings ledger would corrupt the one number on the site that is
+ * supposed to be beyond question.
  *
  *   npx tsx scripts/seed-proof-demo.ts          # seed
  *   npx tsx scripts/seed-proof-demo.ts --clear  # remove everything it wrote
@@ -15,7 +15,8 @@
 import '../lib/load-env'
 import { randomUUID } from 'node:crypto'
 import { desc, eq, like } from 'drizzle-orm'
-import { db } from '../lib/db'
+import { db, runBatch } from '../lib/db'
+import { connectNodeD1 } from '../lib/db/node'
 import {
   affiliateClicks,
   comparisonEvents,
@@ -36,13 +37,15 @@ const COMPARISONS = 1_000
 const TARGET_SAVINGS = 3_000_000
 const CLICKS = 300
 
-async function assertNotProduction() {
-  const url = process.env.DATABASE_URL ?? ''
-  const looksLocal = /localhost|127\.0\.0\.1|host\.docker\.internal/.test(url)
+/** Rows per event insert: 4 columns each, under D1's 100 bound parameters. */
+const EVENT_ROWS_PER_INSERT = 25
 
-  if (!looksLocal && process.env.PROOF_DEMO_ALLOW_REMOTE !== '1') {
+async function assertNotProduction() {
+  const local = (process.env.D1_TARGET || 'local') === 'local'
+
+  if (!local && process.env.PROOF_DEMO_ALLOW_REMOTE !== '1') {
     console.error(
-      'Refusing to run: DATABASE_URL is not local.\n' +
+      'Refusing to run: D1_TARGET is not local.\n' +
         'This writes fake rows into savings_ledger, which is the source of the\n' +
         'public savings figure. Set PROOF_DEMO_ALLOW_REMOTE=1 only if you are\n' +
         'certain this is a throwaway database.',
@@ -107,9 +110,16 @@ async function seed() {
     }
   })
 
-  for (let i = 0; i < eventRows.length; i += 200) {
-    await db.insert(comparisonEvents).values(eventRows.slice(i, i + 200)).onConflictDoNothing()
+  const eventInserts = []
+  for (let i = 0; i < eventRows.length; i += EVENT_ROWS_PER_INSERT) {
+    eventInserts.push(
+      db
+        .insert(comparisonEvents)
+        .values(eventRows.slice(i, i + EVENT_ROWS_PER_INSERT))
+        .onConflictDoNothing(),
+    )
   }
+  await runBatch(eventInserts)
 
   // Clicks with ledger rows summing to the target.
   const perClick = Math.round((TARGET_SAVINGS / CLICKS) * 100) / 100
@@ -122,7 +132,7 @@ async function seed() {
       .values({
         providerId: provider.id,
         corridorId: corridor.id,
-        amountSent: '500',
+        amountSent: 500,
         deliveryMethod: 'bank',
         clickId: randomUUID(),
         utm: DEMO_UTM,
@@ -136,10 +146,10 @@ async function seed() {
       affiliateClickId: click.id,
       corridorId: corridor.id,
       providerId: provider.id,
-      amountSent: '500',
-      providerReceivedPkr: '187500',
-      bankReceivedPkr: String(187_500 - perClick),
-      savingPkr: String(perClick),
+      amountSent: 500,
+      providerReceivedPkr: 187_500,
+      bankReceivedPkr: 187_500 - perClick,
+      savingPkr: perClick,
       createdAt,
     })
   }
@@ -176,6 +186,7 @@ async function report() {
 
 async function main() {
   await assertNotProduction()
+  const d1 = await connectNodeD1()
 
   if (process.argv.includes('--clear')) {
     await clear()
@@ -184,7 +195,7 @@ async function main() {
   }
 
   await report()
-  await db.$client.end()
+  await d1.close()
 }
 
 main().catch((error) => {

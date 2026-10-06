@@ -4,7 +4,8 @@ import { assertAdmin } from '@/lib/admin/assert-admin'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { DELIVERY_METHODS, corridors, providers, rateQuotes } from '@/lib/db/schema'
+import { DELIVERY_METHODS, corridors, providers } from '@/lib/db/schema'
+import { applyQuoteChanges } from '@/lib/quotes-write'
 import { computeReceived } from '@/lib/ranking/compute'
 
 /**
@@ -54,22 +55,28 @@ export async function saveManualQuote(
   }
 
   try {
-    await db.insert(rateQuotes).values({
-      providerId: input.providerId,
-      corridorId: input.corridorId,
-      deliveryMethod: input.deliveryMethod,
-      amountSent: String(input.amountSent),
-      rate: String(input.rate),
-      fee: String(input.fee),
-      amountReceived: String(amountReceived),
-      deliverySpeedText: input.deliverySpeedText,
-      deliverySpeedMinutes: input.deliverySpeedMinutes ?? null,
-      promoFlag: Boolean(input.promoNote),
-      promoNote: input.promoNote || null,
-      source: 'manual',
-      stale: false,
-      capturedAt: new Date(),
-    })
+    // Through the same writer as the refresh, so the quote shows on the site
+    // (latest_quotes) as well as in the history.
+    await applyQuoteChanges([
+      {
+        kind: 'fresh',
+        quote: {
+          providerId: input.providerId,
+          corridorId: input.corridorId,
+          deliveryMethod: input.deliveryMethod,
+          amountSent: input.amountSent,
+          rate: input.rate,
+          fee: input.fee,
+          amountReceived,
+          deliverySpeedText: input.deliverySpeedText,
+          deliverySpeedMinutes: input.deliverySpeedMinutes ?? null,
+          promoFlag: Boolean(input.promoNote),
+          promoNote: input.promoNote || null,
+          source: 'manual',
+          capturedAt: new Date(),
+        },
+      },
+    ])
   } catch (error) {
     console.error('[admin] manual quote insert failed:', error)
     return { ok: false, message: 'Could not save. Check the server logs.' }

@@ -18,7 +18,7 @@ import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, toMoney } from '@/lib/db'
 import {
   DELIVERY_METHODS,
   type SendCurrency,
@@ -97,7 +97,7 @@ export async function GET(
       const [inserted] = await db.insert(affiliateClicks).values({
         providerId: provider.id,
         corridorId,
-        amountSent: query.amount ? String(query.amount) : null,
+        amountSent: query.amount ? toMoney(query.amount) : null,
         deliveryMethod: query.method ?? null,
         clickId,
         referrer: request.headers.get('referer'),

@@ -1,15 +1,15 @@
-import './lib/load-env'
 import { defineConfig } from 'drizzle-kit'
 
+/**
+ * drizzle-kit only generates migrations here (`npm run db:generate`). Wrangler
+ * applies them: `npm run db:migrate:local`, or `db:migrate:remote` for the
+ * real database. Migrations only ever add (expand/contract), because a Worker
+ * rollback does not roll the database back.
+ */
 export default defineConfig({
   schema: './lib/db/schema.ts',
-  out: './drizzle',
-  dialect: 'postgresql',
-  dbCredentials: {
-    // Use the DIRECT (port 5432) Supabase URL for migrations — the pooled
-    // connection on 6543 cannot run DDL transactions reliably.
-    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL!,
-  },
+  out: './migrations',
+  dialect: 'sqlite',
   verbose: true,
   strict: true,
 })

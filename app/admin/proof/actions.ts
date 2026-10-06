@@ -4,7 +4,7 @@ import { assertAdmin } from '@/lib/admin/assert-admin'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { and, eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, toMoney, toRate } from '@/lib/db'
 import { DELIVERY_METHODS, bankBenchmarks } from '@/lib/db/schema'
 import { invalidateProofStats } from '@/lib/proof/stats'
 
@@ -45,16 +45,16 @@ export async function updateBenchmark(
       .values({
         corridorId,
         deliveryMethod,
-        rate: String(rate),
-        fee: String(fee),
+        rate: toRate(rate),
+        fee: toMoney(fee),
         note: note?.trim() || null,
         pinned: true,
       })
       .onConflictDoUpdate({
         target: [bankBenchmarks.corridorId, bankBenchmarks.deliveryMethod],
         set: {
-          rate: String(rate),
-          fee: String(fee),
+          rate: toRate(rate),
+          fee: toMoney(fee),
           note: note?.trim() || null,
           pinned: true,
           updatedAt: new Date(),

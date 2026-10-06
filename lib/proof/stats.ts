@@ -6,9 +6,9 @@
  * that only real activity writes to. When there is no data the field is 0 or
  * null and the claim that depends on it does not render.
  */
-import { and, eq, gte, isNotNull, sql } from 'drizzle-orm'
+import { and, count, eq, gte, isNotNull, sql, sum } from 'drizzle-orm'
 import { db, toNum } from '@/lib/db'
-import { providers, savingsLedger } from '@/lib/db/schema'
+import { providers, savingsLedger, siteStatsDaily } from '@/lib/db/schema'
 import { LAUNCH_DATE, PROOF_CACHE_MS, REFRESH_MINUTES } from './config'
 
 export interface ProofStats {
@@ -51,13 +51,7 @@ function monthStart(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
 }
 
-/**
- * `YYYY-MM-DD`, for comparing against `site_stats_daily.date` — a text column.
- *
- * Passing a Date straight into a raw `sql` template fails: postgres.js binds
- * parameters itself and throws ERR_INVALID_ARG_TYPE on a Date in a position it
- * cannot infer. The Drizzle query builder converts it, `db.execute` does not.
- */
+/** `YYYY-MM-DD`, for comparing against `site_stats_daily.date` — a text column. */
 function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
@@ -72,35 +66,35 @@ export async function getProofStats(options?: { fresh?: boolean }): Promise<Proo
       // Since launch. `saving_pkr IS NOT NULL` drops clicks in corridors that
       // had no benchmark, which is the whole reason the column is nullable.
       db
-        .select({ total: sql<string | null>`sum(${savingsLedger.savingPkr})` })
+        .select({ total: sum(savingsLedger.savingPkr) })
         .from(savingsLedger)
         .where(
           and(isNotNull(savingsLedger.savingPkr), gte(savingsLedger.createdAt, LAUNCH_DATE)),
         ),
 
       db
-        .select({ total: sql<string | null>`sum(${savingsLedger.savingPkr})` })
+        .select({ total: sum(savingsLedger.savingPkr) })
         .from(savingsLedger)
         .where(and(isNotNull(savingsLedger.savingPkr), gte(savingsLedger.createdAt, since))),
 
       // Comparisons and leader changes come from the daily rollup rather than
       // the raw event table: the rollup is what /admin charts, and reading the
       // same source keeps the hero and the dashboard from disagreeing.
-      db.execute(sql`
-        SELECT
-          coalesce(sum(comparisons_run), 0)::int      AS comparisons,
-          coalesce(sum(best_provider_changes), 0)::int AS changes
-        FROM site_stats_daily
-        WHERE date >= ${isoDay(since)}
-      `),
+      db
+        .select({
+          comparisons: sql<number>`coalesce(sum(${siteStatsDaily.comparisonsRun}), 0)`,
+          changes: sql<number>`coalesce(sum(${siteStatsDaily.bestProviderChanges}), 0)`,
+        })
+        .from(siteStatsDaily)
+        .where(gte(siteStatsDaily.date, isoDay(since))),
 
       db
-        .select({ n: sql<number>`count(*)::int` })
+        .select({ n: count() })
         .from(providers)
         .where(and(eq(providers.active, true), eq(providers.isBenchmark, false))),
     ])
 
-    const counters = (monthCounters as unknown as { comparisons: number; changes: number }[])[0]
+    const counters = monthCounters[0]
 
     const value: ProofStats = {
       savingsSinceLaunch: toNum(savings[0]?.total ?? 0),

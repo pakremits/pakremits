@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pakremits-staging",
+  "compatibility_date": "2026-10-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pakremits-staging",
+      // Placeholder until the staging database is created. Local commands key
+      // their copy of the database by this id, so changing it starts a fresh
+      // local database (re-run db:migrate:local and the seed).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

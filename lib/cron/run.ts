@@ -12,7 +12,7 @@
  * One implementation, both callers, one place that records the run.
  */
 import { eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, toRate } from '@/lib/db'
 import { type SendCurrency, cronRuns, midMarketRates } from '@/lib/db/schema'
 import { CORRIDORS } from '@/lib/corridors'
 import { getMidMarketRate } from '@/lib/fx'
@@ -40,38 +40,49 @@ export interface FullRefreshResult {
   durationMs: number
 }
 
-/** Refresh the mid-market line for all eight currencies, in parallel. */
+/**
+ * Refresh the mid-market line for all eight currencies: fetched in parallel,
+ * written in one insert.
+ */
 async function refreshMidMarket(): Promise<{
   written: number
   failed: string[]
   rates: Map<SendCurrency, number>
 }> {
   const failed: string[] = []
-  const rates = new Map<SendCurrency, number>()
-
-  const results = await Promise.all(
+  const fetched = await Promise.all(
     CORRIDORS.map(async (corridor) => {
       try {
-        const rate = await getMidMarketRate(corridor.fromCurrency)
-        await db.insert(midMarketRates).values({
-          fromCurrency: rate.fromCurrency,
-          toCurrency: 'PKR',
-          rate: String(rate.rate),
-          capturedAt: rate.capturedAt,
-          source: rate.source,
-        })
-        rates.set(rate.fromCurrency, rate.rate)
-        return true
+        return await getMidMarketRate(corridor.fromCurrency)
       } catch (error) {
         failed.push(
           `${corridor.fromCurrency}: ${error instanceof Error ? error.message : String(error)}`,
         )
-        return false
+        return null
       }
     }),
   )
+  const rows = fetched.filter((rate) => rate !== null)
+  const rates = new Map<SendCurrency, number>()
+  if (rows.length === 0) return { written: 0, failed, rates }
 
-  return { written: results.filter(Boolean).length, failed, rates }
+  try {
+    await db.insert(midMarketRates).values(
+      rows.map((rate) => ({
+        fromCurrency: rate.fromCurrency,
+        toCurrency: 'PKR',
+        rate: toRate(rate.rate),
+        capturedAt: rate.capturedAt,
+        source: rate.source,
+      })),
+    )
+  } catch (error) {
+    failed.push(`write: ${error instanceof Error ? error.message : String(error)}`)
+    return { written: 0, failed, rates }
+  }
+
+  for (const rate of rows) rates.set(rate.fromCurrency, rate.rate)
+  return { written: rows.length, failed, rates }
 }
 
 /**
@@ -133,8 +144,8 @@ export async function runFullRefresh(job = 'refresh-rates'): Promise<FullRefresh
     proof.statsDaysRolled = await rollUpSiteStats()
     proof.prunedEvents = await pruneComparisonEvents()
 
-    // The 5-minute memo would otherwise keep serving pre-refresh numbers to
-    // this instance for another five minutes.
+    // The memo would otherwise keep serving pre-refresh numbers to anything
+    // in this process that reads them after the run.
     invalidateProofStats()
   } catch (error) {
     console.error('[cron] proof layer failed:', error)
@@ -151,7 +162,9 @@ export async function runFullRefresh(job = 'refresh-rates'): Promise<FullRefresh
         adaptersOk: quotes.adaptersOk,
         adaptersFailed: quotes.adaptersFailed,
         error:
-          quotes.failures.length > 0 ? JSON.stringify(quotes.failures.slice(0, 20)) : null,
+          quotes.failures.length > 0 || quotes.writeErrors.length > 0
+            ? JSON.stringify([...quotes.writeErrors, ...quotes.failures].slice(0, 20))
+            : null,
       })
       .where(eq(cronRuns.id, runId))
       .catch((error) => console.error('[cron] could not record run finish:', error))

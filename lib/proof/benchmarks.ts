@@ -8,15 +8,15 @@
  * comparison table and the savings ledger can never disagree about what a
  * typical bank would have paid.
  */
-import { and, eq, lt, sql } from 'drizzle-orm'
-import { db, toNum } from '@/lib/db'
+import { and, count, eq, lt } from 'drizzle-orm'
+import { db, runBatch, toMoney, toNum, toRate } from '@/lib/db'
 import {
   type DeliveryMethod,
   type SendCurrency,
   bankBenchmarks,
   corridors,
 } from '@/lib/db/schema'
-import { computeReceived, round } from '@/lib/ranking/compute'
+import { computeReceived } from '@/lib/ranking/compute'
 
 /**
  * Typical high-street retail pricing, as a markup off mid-market plus a wire
@@ -155,49 +155,43 @@ export async function refreshBenchmarks(
 
     const cutoff = new Date(Date.now() - BENCHMARK_MAX_AGE_DAYS * 86_400_000)
 
+    const upserts = []
     for (const corridor of corridorRows) {
       const mid = midMarketByCurrency.get(corridor.fromCurrency)
       const assumption = BENCHMARK_ASSUMPTIONS[corridor.fromCurrency]
       if (!mid || !assumption) continue
 
-      const rate = round(mid * (1 - assumption.markupPercent / 100), 6)
+      const rate = toRate(mid * (1 - assumption.markupPercent / 100))
+      const fee = toMoney(assumption.fee)
       const note =
         `Generated from the mid-market rate less ${assumption.markupPercent}%, ` +
         `plus a ${assumption.fee} ${corridor.fromCurrency} wire fee. Indicative, not a quote.`
 
       for (const method of methods) {
         // Insert when absent; update only an unpinned row that has gone stale.
-        const result = await db
-          .insert(bankBenchmarks)
-          .values({
-            corridorId: corridor.id,
-            deliveryMethod: method,
-            rate: String(rate),
-            fee: String(assumption.fee),
-            note,
-            pinned: false,
-          })
-          .onConflictDoUpdate({
-            target: [bankBenchmarks.corridorId, bankBenchmarks.deliveryMethod],
-            set: {
-              rate: String(rate),
-              fee: String(assumption.fee),
-              note,
-              updatedAt: new Date(),
-            },
-            where: and(
-              eq(bankBenchmarks.pinned, false),
-              lt(bankBenchmarks.updatedAt, cutoff),
-            ),
-          })
-          .returning({ id: bankBenchmarks.id })
-
-        if (result.length > 0) written += 1
+        upserts.push(
+          db
+            .insert(bankBenchmarks)
+            .values({ corridorId: corridor.id, deliveryMethod: method, rate, fee, note, pinned: false })
+            .onConflictDoUpdate({
+              target: [bankBenchmarks.corridorId, bankBenchmarks.deliveryMethod],
+              set: { rate, fee, note, updatedAt: new Date() },
+              setWhere: and(
+                eq(bankBenchmarks.pinned, false),
+                lt(bankBenchmarks.updatedAt, cutoff),
+              ),
+            })
+            .returning({ id: bankBenchmarks.id }),
+        )
       }
     }
 
+    // One batch: an upsert that skipped its update returns no row.
+    const results = (await runBatch(upserts)) as { id: number }[][]
+    written = results.filter((rows) => rows.length > 0).length
+
     const [pinned] = await db
-      .select({ n: sql<number>`count(*)::int` })
+      .select({ n: count() })
       .from(bankBenchmarks)
       .where(eq(bankBenchmarks.pinned, true))
     skippedPinned = pinned?.n ?? 0

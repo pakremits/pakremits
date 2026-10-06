@@ -11,11 +11,11 @@
  *  - No benchmark for the corridor means `savingPkr` is null and the row is
  *    excluded from every total. It is never replaced with a default.
  */
-import { and, desc, eq } from 'drizzle-orm'
-import { db, toNum } from '@/lib/db'
+import { and, eq } from 'drizzle-orm'
+import { db, toMoney, toNum } from '@/lib/db'
 import {
   type DeliveryMethod,
-  rateQuotes,
+  latestQuotes,
   savingsLedger,
 } from '@/lib/db/schema'
 import { computeReceived, round } from '@/lib/ranking/compute'
@@ -54,17 +54,16 @@ export async function recordSaving(input: LedgerInput): Promise<number | null> {
     const quotedAt = nearestStandardAmount(currency, amount)
 
     const [quote] = await db
-      .select({ rate: rateQuotes.rate, fee: rateQuotes.fee })
-      .from(rateQuotes)
+      .select({ rate: latestQuotes.rate, fee: latestQuotes.fee })
+      .from(latestQuotes)
       .where(
         and(
-          eq(rateQuotes.providerId, providerId),
-          eq(rateQuotes.corridorId, corridorId),
-          eq(rateQuotes.deliveryMethod, method),
-          eq(rateQuotes.amountSent, String(quotedAt)),
+          eq(latestQuotes.corridorId, corridorId),
+          eq(latestQuotes.deliveryMethod, method),
+          eq(latestQuotes.amountSent, quotedAt),
+          eq(latestQuotes.providerId, providerId),
         ),
       )
-      .orderBy(desc(rateQuotes.capturedAt))
       .limit(1)
 
     if (!quote) return null
@@ -86,10 +85,10 @@ export async function recordSaving(input: LedgerInput): Promise<number | null> {
         affiliateClickId,
         corridorId,
         providerId,
-        amountSent: String(amount),
-        providerReceivedPkr: String(providerReceived),
-        bankReceivedPkr: bankReceived === null ? null : String(bankReceived),
-        savingPkr: saving === null ? null : String(saving),
+        amountSent: toMoney(amount),
+        providerReceivedPkr: providerReceived,
+        bankReceivedPkr: bankReceived,
+        savingPkr: saving,
       })
       // One ledger row per click. A retried redirect must not double-count.
       .onConflictDoNothing({ target: savingsLedger.affiliateClickId })

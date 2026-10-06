@@ -18,7 +18,7 @@
  * mid-market — we simply do not fire. A misleading alert is worse than a late
  * one.
  */
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, lt } from 'drizzle-orm'
 import { db, toNum } from '@/lib/db'
 import { type SendCurrency, rateAlerts } from '@/lib/db/schema'
 import { CURRENCY_SYMBOLS, corridorByCurrency } from '@/lib/corridors'
@@ -264,7 +264,7 @@ export async function pruneUnconfirmedAlerts(hours = 48): Promise<number> {
       and(
         eq(rateAlerts.channel, 'email'),
         eq(rateAlerts.confirmed, false),
-        sql`${rateAlerts.createdAt} < now() - make_interval(hours => ${hours})`,
+        lt(rateAlerts.createdAt, new Date(Date.now() - hours * 3_600_000)),
       ),
     )
     .returning({ id: rateAlerts.id })

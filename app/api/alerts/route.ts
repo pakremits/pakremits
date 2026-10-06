@@ -7,7 +7,7 @@
  */
 import { and, eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, toRate } from '@/lib/db'
 import { rateAlerts } from '@/lib/db/schema'
 import { AlertInputSchema, normaliseContact } from '@/lib/alerts/validate'
 import { generateAlertToken } from '@/lib/alerts/tokens'
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
         userContact: contact,
         channel: input.channel,
         fromCurrency: input.fromCurrency,
-        targetRate: String(input.targetRate),
+        targetRate: toRate(input.targetRate),
         direction: input.direction,
         confirmed,
         confirmedAt: confirmed ? new Date() : null,

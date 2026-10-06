@@ -1,6 +1,7 @@
 /** Ensure providers collected by the scheduled job exist before it refreshes. */
 import '../lib/load-env'
-import { db } from '../lib/db'
+import { db, runBatch } from '../lib/db'
+import { connectNodeD1 } from '../lib/db/node'
 import { providers } from '../lib/db/schema'
 
 const RATE_PROVIDERS = [
@@ -98,26 +99,30 @@ const RATE_PROVIDERS = [
 ] as const
 
 async function main() {
-  for (const provider of RATE_PROVIDERS) {
-    await db
-      .insert(providers)
-      .values(provider)
-      .onConflictDoUpdate({
-        target: providers.slug,
-        set: {
-          name: provider.name,
-          brandColor: provider.brandColor,
-          brandTextColor: provider.brandTextColor,
-          homepageUrl: provider.homepageUrl,
-          supportsBank: provider.supportsBank,
-          supportsWallet: provider.supportsWallet,
-          supportsNeobank: provider.supportsNeobank,
-          supportsCash: provider.supportsCash,
-          supportsRda: provider.supportsRda,
-        },
-      })
-  }
-  console.log(`Synced ${RATE_PROVIDERS.length} scheduled-rate providers.`)
+  const d1 = await connectNodeD1()
+  await runBatch(
+    RATE_PROVIDERS.map((provider) =>
+      db
+        .insert(providers)
+        .values(provider)
+        .onConflictDoUpdate({
+          target: providers.slug,
+          set: {
+            name: provider.name,
+            brandColor: provider.brandColor,
+            brandTextColor: provider.brandTextColor,
+            homepageUrl: provider.homepageUrl,
+            supportsBank: provider.supportsBank,
+            supportsWallet: provider.supportsWallet,
+            supportsNeobank: provider.supportsNeobank,
+            supportsCash: provider.supportsCash,
+            supportsRda: provider.supportsRda,
+          },
+        }),
+    ),
+  )
+  await d1.close()
+  console.log(`Synced ${RATE_PROVIDERS.length} scheduled-rate providers (${d1.target} D1).`)
 }
 
 main().catch((error) => {
