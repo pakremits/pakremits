@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { IconSelect, type IconSelectOption } from '@/components/icon-select'
 import { CountryFlag } from '@/components/select-icons'
 import { TurnstileWidget } from '@/components/turnstile-widget'
+import type { Locale } from '@/i18n/routing'
+import { refreshCadence } from '@/lib/cadence'
 
 /**
  * The rate alert dialog.
@@ -52,6 +54,7 @@ export function RateAlertDialog({
   turnstileSiteKey: string
 }) {
   const t = useTranslations('alerts')
+  const locale = useLocale() as Locale
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [open, setOpen] = useState(false)
 
@@ -236,7 +239,7 @@ export function RateAlertDialog({
             </div>
           ) : (
             <>
-              <p className="mt-2 text-[14.5px] leading-normal text-muted sm:text-[16.5px] sm:leading-relaxed">{t('dialogBody')}</p>
+              <p className="mt-2 text-[14.5px] leading-normal text-muted sm:text-[16.5px] sm:leading-relaxed">{t('dialogBody', { cadence: refreshCadence(locale) })}</p>
 
               <form onSubmit={onSubmit} className="mt-5 sm:mt-7">
                 <label htmlFor="alert-pair" className={labelClass}>

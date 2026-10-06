@@ -35,6 +35,10 @@ export function unbindD1(): void {
   bound = undefined
 }
 
+export function isD1Bound(): boolean {
+  return bound !== undefined
+}
+
 export function getDb(): Db {
   if (!bound) {
     throw new Error(

@@ -9,6 +9,7 @@
  * The rule throughout: below its threshold a claim does not render. There is no
  * placeholder, no "coming soon", and no rounded-up stand-in.
  */
+import { refreshCadence } from '@/lib/cadence'
 import { CLAIM_FIRST_PAKISTAN_ONLY_SITE, THRESHOLDS } from './config'
 import type { ProofStats } from './stats'
 
@@ -57,7 +58,7 @@ export function evaluateClaims({
       id: 'providersRefreshed',
       visible: dbUp && stats.providersCompared > 0,
       reason: dbUp
-        ? `${stats.providersCompared} active providers, refreshed every ${stats.refreshMinutes} minutes.`
+        ? `${stats.providersCompared} active providers, refreshed ${refreshCadence('en', stats.refreshMinutes)}.`
         : 'Hidden: the provider count could not be read.',
     },
     {

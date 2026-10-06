@@ -3,10 +3,13 @@ import { searchIndexingEnabled } from '@/lib/seo'
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
+/** Written as /robots.txt when the site is built. */
+export const dynamic = 'force-static'
+
 export default function robots(): MetadataRoute.Robots {
   /*
    * Staging and previews are kept out of search by a noindex on every response
-   * (the X-Robots-Tag header in next.config.ts, plus the robots meta tag), not
+   * (the X-Robots-Tag header in _headers, plus the robots meta tag), not
    * by `Disallow: /`. A crawler that is disallowed never fetches the page, so
    * it never sees the noindex, and a linked staging URL can still be listed.
    * The crawl rules below are therefore the same everywhere; only the sitemap
@@ -28,9 +31,9 @@ export default function robots(): MetadataRoute.Robots {
           '/go/',
           // Alert URLs are capability tokens. Indexing one would publish it.
           '/alerts/',
-          // Not the internal /corridor/, /rate/ and /method/ paths: they only
-          // ever answer with a permanent redirect to the public URL, and a
-          // disallow would stop Google from seeing where they lead.
+          // Not the old /corridor/, /rate/ and /method/ paths: they only ever
+          // answer with a permanent redirect to the public URL (_redirects),
+          // and a disallow would stop Google from seeing where they lead.
         ],
       },
     ],

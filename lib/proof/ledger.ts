@@ -19,7 +19,7 @@ import {
   savingsLedger,
 } from '@/lib/db/schema'
 import { computeReceived, round } from '@/lib/ranking/compute'
-import { nearestStandardAmount } from '@/lib/quotes'
+import { nearestStandardAmount } from '@/lib/comparison'
 import type { SendCurrency } from '@/lib/db/schema'
 import { benchmarkReceived, getBenchmark } from './benchmarks'
 

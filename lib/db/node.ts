@@ -31,6 +31,17 @@ function required(name: string): string {
   return value
 }
 
+/** The local D1 through wrangler, in this process. Dispose of it when done. */
+export async function openLocalD1() {
+  const { getPlatformProxy } = await import('wrangler')
+  return getPlatformProxy<{ DB: D1Database }>({
+    // The local database only, even if the config ever marks it remote.
+    remoteBindings: false,
+    // Only the D1 binding is used; keep .env secrets out of the local runtime.
+    envFiles: [],
+  })
+}
+
 /** Bind the database named by D1_TARGET for every query in this process. */
 export async function connectNodeD1(
   target: string = process.env.D1_TARGET || 'local',
@@ -53,13 +64,7 @@ export async function connectNodeD1(
     throw new Error(`D1_TARGET must be "local" or "remote", got "${target}"`)
   }
 
-  const { getPlatformProxy } = await import('wrangler')
-  const proxy = await getPlatformProxy<{ DB: D1Database }>({
-    // The local database only, even if the config ever marks it remote.
-    remoteBindings: false,
-    // Only the D1 binding is used; keep .env secrets out of the local runtime.
-    envFiles: [],
-  })
+  const proxy = await openLocalD1()
   return {
     db: bindD1(proxy.env.DB),
     target,

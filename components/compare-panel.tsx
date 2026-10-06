@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import type { Locale } from '@/i18n/routing'
 import { corridorPath } from '@/lib/routes'
-import type { Comparison } from '@/lib/quotes'
+import type { Comparison } from '@/lib/comparison'
+import type { DeliveryMethod } from '@/lib/db/schema'
+import { loadComparison, recordComparison } from '@/lib/quote-data'
 import type { SortKey } from '@/lib/ranking/rank'
 import type { PayoutOption } from '@/components/select-icons'
 import { CompareSearch, type SearchCorridorOption, type SearchSelection } from '@/components/compare-search'
@@ -15,10 +17,10 @@ import { PAYOUT_METHOD, initialPayoutOption } from '@/lib/payout'
 /**
  * The comparison panel.
  *
- * Server-rendered with real data on first paint, then updated in place from
- * /api/quotes. All ranking and arithmetic stays on the server — this component
- * only renders what it is given, so there is one implementation of the ranking
- * rules rather than two that can drift.
+ * Built into the page with the quotes current at build time, then re-ranked in
+ * the browser from the corridor's data file (lib/quote-data.ts) with the same
+ * code the build used, so there is one implementation of the ranking rules
+ * rather than two that can drift.
  *
  * It wears the same search bar and result cards as /compare; the difference is
  * that nothing navigates. Editing the form changes nothing until Compare is
@@ -61,14 +63,21 @@ export function ComparePanel({ initial, corridors, initialPayout, switchCorridor
   // Lets a slow response from an earlier request lose to a newer one.
   const requestSeq = useRef(0)
 
-  async function load(query: { corridor: string; method: string; amount: number; sort: SortKey }) {
+  async function load(query: {
+    corridor: string
+    method: DeliveryMethod
+    amount: number
+    sort: SortKey
+  }) {
     const seq = ++requestSeq.current
     setError(false)
     try {
-      const params = new URLSearchParams({ ...query, amount: String(query.amount) })
-      const response = await fetch(`/api/quotes?${params}`)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const payload = (await response.json()) as Comparison
+      const payload = await loadComparison(query.corridor, {
+        method: query.method,
+        amount: query.amount,
+        sortBy: query.sort,
+      })
+      recordComparison(query.corridor)
       // A stale response must never overwrite a newer one.
       if (seq === requestSeq.current) setData(payload)
       return seq === requestSeq.current

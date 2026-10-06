@@ -2,6 +2,18 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "pakremits-staging",
   "compatibility_date": "2026-10-01",
+
+  // The site: every page, data file and image that `npm run build` writes to
+  // out/, served as static assets (free and unlimited on Workers). out/_headers
+  // and out/_redirects carry the headers and redirects.
+  "assets": {
+    "directory": "out",
+    // Unknown URLs get out/404.html, with a 404 status.
+    "not_found_handling": "404-page",
+    // /compare/uk-to-pakistan serves compare/uk-to-pakistan.html.
+    "html_handling": "auto-trailing-slash"
+  },
+
   "d1_databases": [
     {
       "binding": "DB",

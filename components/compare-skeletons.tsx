@@ -1,4 +1,4 @@
-import { Bone } from '@/components/compare-results'
+import { Bone, ResultsSkeleton } from '@/components/compare-results'
 
 /**
  * Placeholders for the /compare page around the results list, shared by
@@ -77,6 +77,32 @@ export function CardsSkeleton() {
         <Bone className="h-6 w-6" />
         <Bone className="h-4 w-20" />
       </div>
+    </div>
+  )
+}
+
+/**
+ * The whole /compare page with every value greyed out: what shows between a
+ * Compare click and the results, and while the page's quotes load.
+ */
+export function ResultsPageSkeleton() {
+  return (
+    <div aria-busy="true">
+      <div className="pt-6 sm:py-8">
+        <div className="mx-auto max-w-[1120px] px-6">
+          <SummarySkeleton className="sm:hidden" />
+          <SearchBarSkeleton className="hidden" />
+        </div>
+      </div>
+
+      <main className="mx-auto flex max-w-[1120px] flex-col px-6 pt-6 sm:pt-12 lg:block">
+        <div className="contents lg:flex lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+          <TitleSkeleton />
+          <CardsSkeleton />
+        </div>
+
+        <ResultsSkeleton className="mt-12" />
+      </main>
     </div>
   )
 }

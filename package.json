@@ -3,9 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "tsx scripts/with-local-d1.ts next dev",
+    "build": "tsx scripts/with-local-d1.ts next build && tsx scripts/write-static-config.ts",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",

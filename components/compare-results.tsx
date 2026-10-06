@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { useRef, useState, useSyncExternalStore } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { Comparison } from '@/lib/quotes'
+import { isOutOfDate } from '@/lib/cadence'
+import type { Comparison } from '@/lib/comparison'
+import { loadComparison, recordComparison } from '@/lib/quote-data'
 import type { SortKey } from '@/lib/ranking/rank'
 import { formatPkr } from '@/lib/ranking/compute'
 import { formatSend } from '@/lib/corridors'
@@ -16,9 +18,9 @@ import { isNamedBankAccount } from '@/lib/payout'
 /**
  * Ranked results on /compare.
  *
- * Server-rendered with the requested selection; the sort pills re-fetch from
- * /api/quotes so all ranking still happens on the server, exactly as in the
- * live ComparePanel.
+ * Rendered in the browser from the corridor's data file; the sort pills
+ * re-rank with the same code (lib/comparison.ts), exactly as in the live
+ * ComparePanel.
  */
 
 const SORT_KEYS: SortKey[] = ['received', 'fastest', 'lowest-fee']
@@ -75,19 +77,13 @@ export function CompareResults({ initial, payout, payoutLabel }: Props) {
     setPending(true)
     setError(false)
 
-    const params = new URLSearchParams({
-      corridor: initial.corridorSlug,
+    loadComparison(initial.corridorSlug, {
       method: initial.deliveryMethod,
-      amount: String(initial.amount),
-      sort: next,
+      amount: initial.amount,
+      sortBy: next,
     })
-
-    fetch(`/api/quotes?${params}`)
-      .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        return response.json() as Promise<Comparison>
-      })
       .then((payload) => {
+        recordComparison(initial.corridorSlug)
         if (seq === requestSeq.current) setData(payload)
       })
       .catch(() => {
@@ -126,6 +122,19 @@ interface ViewProps {
   showCapturedAt?: boolean
 }
 
+/** When the page loaded, in the browser; null on the server. */
+const PAGE_LOADED_AT = typeof window === 'undefined' ? null : Date.now()
+const subscribeNever = () => () => {}
+
+/**
+ * The reader's clock, for judging staleness: a page built hours ago must not
+ * present its quotes as current. Null while hydrating, so the first client
+ * render matches the built HTML.
+ */
+function usePageClock(): number | null {
+  return useSyncExternalStore(subscribeNever, () => PAGE_LOADED_AT, () => null)
+}
+
 /** 24-hour Karachi time, fixed zone so server and client render the same. */
 const CAPTURED_TIME = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Karachi',
@@ -152,6 +161,7 @@ export function ResultsView({
   const t = useTranslations('panel')
   const locale = useLocale()
   const layout = useResultsLayout()
+  const now = usePageClock()
 
   const speedLabel = (minutes: number | null, fallback: string): string => {
     // The provider's own wording when it is short ("3–5 days"); a sentence such
@@ -307,7 +317,8 @@ export function ResultsView({
                         </bdi>
                       </span>
                     )}
-                    {q.stale && (
+                    {(q.stale ||
+                      (!q.isBenchmark && now !== null && isOutOfDate(q.capturedAt, now))) && (
                       <span className={`${BADGE} bg-gold-bg text-gold-dark`}>
                         {t('stale')}
                       </span>

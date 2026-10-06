@@ -15,9 +15,6 @@
  */
 export const LAUNCH_DATE = new Date('2026-09-01T00:00:00Z')
 
-/** Cron cadence, in minutes. Quoted in "refreshed every N minutes". */
-export const REFRESH_MINUTES = 15
-
 /** How long getProofStats() reuses a computed result. */
 export const PROOF_CACHE_MS = 5 * 60 * 1000
 

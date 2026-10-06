@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 import { type Locale } from '@/i18n/routing'
+import { refreshCadence } from '@/lib/cadence'
 import { staticPath } from '@/lib/routes'
 import { claimMap, evaluateClaims } from '@/lib/proof/claims'
 import { formatProofPkr, formatProofPkrFull } from '@/lib/proof/format'
@@ -58,7 +59,7 @@ export async function ProofStrip({
       key: 'providersRefreshed',
       body: t('providersRefreshed', {
         providers: stats.providersCompared,
-        minutes: stats.refreshMinutes,
+        cadence: refreshCadence(locale, stats.refreshMinutes),
       }),
       href: benchmarkHref,
     })

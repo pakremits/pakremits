@@ -26,6 +26,11 @@ export interface D1HttpOptions {
   databaseId: string
   /** An API token with D1 edit permission. */
   token: string
+  /**
+   * Where /query and /raw live, instead of the Cloudflare API: the local D1
+   * bridge (./d1-bridge) serves the same protocol to the static build.
+   */
+  baseUrl?: string
   fetch?: typeof fetch
   /** Tries per request, including the first. */
   attempts?: number
@@ -104,7 +109,8 @@ export function d1Http(options: D1HttpOptions): D1HttpDatabase {
   const attempts = options.attempts ?? 5
   const backoffMs = options.backoffMs ?? 1000
   const maxRetryAfterMs = options.maxRetryAfterMs ?? 5 * 60 * 1000
-  const base = `${API}/accounts/${options.accountId}/d1/database/${options.databaseId}`
+  const base =
+    options.baseUrl ?? `${API}/accounts/${options.accountId}/d1/database/${options.databaseId}`
   let requests = 0
 
   async function call<T>(endpoint: 'query' | 'raw', body: Body): Promise<T[]> {

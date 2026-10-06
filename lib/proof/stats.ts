@@ -9,7 +9,9 @@
 import { and, count, eq, gte, isNotNull, sql, sum } from 'drizzle-orm'
 import { db, toNum } from '@/lib/db'
 import { providers, savingsLedger, siteStatsDaily } from '@/lib/db/schema'
-import { LAUNCH_DATE, PROOF_CACHE_MS, REFRESH_MINUTES } from './config'
+import { REFRESH_INTERVAL_MINUTES } from '@/lib/cadence'
+import { IN_STATIC_BUILD } from '@/lib/build-phase'
+import { LAUNCH_DATE, PROOF_CACHE_MS } from './config'
 
 export interface ProofStats {
   savingsSinceLaunch: number
@@ -30,19 +32,14 @@ const EMPTY: ProofStats = {
   comparisonsThisMonth: 0,
   bestProviderChangesThisMonth: 0,
   providersCompared: 0,
-  refreshMinutes: REFRESH_MINUTES,
+  refreshMinutes: REFRESH_INTERVAL_MINUTES,
   unavailable: true,
   computedAt: new Date(0),
 }
 
 /**
- * Five-minute memo, per server instance.
- *
- * Deliberately not `unstable_cache` (replaced in Next 16) and not `use cache`
- * (which needs the project-wide `cacheComponents` flag, changing rendering
- * semantics for every existing page). A module-level TTL gives exactly the
- * bounded staleness the brief asks for, works the same in the ISR pages and the
- * dynamic admin, and couples to nothing.
+ * Five-minute memo, per process: the static build renders several pages that
+ * show these figures, and they need only one read.
  */
 let cached: { value: ProofStats; expires: number } | null = null
 
@@ -102,22 +99,25 @@ export async function getProofStats(options?: { fresh?: boolean }): Promise<Proo
       comparisonsThisMonth: counters?.comparisons ?? 0,
       bestProviderChangesThisMonth: counters?.changes ?? 0,
       providersCompared: providerCount[0]?.n ?? 0,
-      refreshMinutes: REFRESH_MINUTES,
+      refreshMinutes: REFRESH_INTERVAL_MINUTES,
       computedAt: new Date(),
     }
 
     cached = { value, expires: Date.now() + PROOF_CACHE_MS }
     return value
   } catch (error) {
-    // A dead database must not take the home page with it. Every claim is
-    // threshold-gated on these numbers, and zeroes hide all of them — which is
-    // the correct failure mode: show no proof rather than a wrong one.
+    // In the static build a failed read fails the build: zeroes would hide
+    // every claim until the next deploy.
+    if (IN_STATIC_BUILD) throw error
+    // Elsewhere a dead database must not take the caller with it. Every claim
+    // is threshold-gated on these numbers, and zeroes hide all of them — which
+    // is the correct failure mode: show no proof rather than a wrong one.
     console.error('[proof] getProofStats failed:', error)
     return EMPTY
   }
 }
 
-/** Drop the memo. Called by /api/cron/revalidate so a refresh shows through. */
+/** Drop the memo, so a refresh in the same process shows through. */
 export function invalidateProofStats(): void {
   cached = null
 }

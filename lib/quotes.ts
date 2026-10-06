@@ -1,179 +1,178 @@
 /**
  * The read side: turning stored quotes into a ranked comparison table.
  *
- * Everything the public site renders comes through here, so the ranking promise
- * is enforced in one place. Note there is no `providers.featured` ordering in
- * the SQL — sponsorship is applied by `rankQuotes`, below the winner, never above.
+ * Every page the static build renders reads through here. The ranking itself
+ * is in lib/comparison.ts, which the browser runs too, so a table re-ranked in
+ * the browser can never disagree with the one baked into the page.
  */
 import { and, desc, eq, sql } from 'drizzle-orm'
+import { IN_STATIC_BUILD } from '@/lib/build-phase'
 import { db, toNum } from '@/lib/db'
 import {
   type DeliveryMethod,
   type SendCurrency,
+  bankBenchmarks,
   corridors,
   latestQuotes,
   midMarketRates,
   providers,
 } from '@/lib/db/schema'
+import { CURRENCY_SYMBOLS, corridorBySlug as corridorConfigBySlug, defaultAmountFor } from '@/lib/corridors'
 import {
-  CURRENCY_SYMBOLS,
-  STANDARD_AMOUNTS,
-  corridorBySlug as corridorConfigBySlug,
-  defaultAmountFor,
-} from '@/lib/corridors'
-import { computeReceived, round } from '@/lib/ranking/compute'
-import { type Benchmark, getBenchmark } from '@/lib/proof/benchmarks'
-import { type RankedQuote, type SortKey, rankQuotes, savingVsBenchmark } from '@/lib/ranking/rank'
+  type Comparison,
+  type QuoteSnapshot,
+  comparisonFromSnapshot,
+  nearestStandardAmount,
+  quotedMethod,
+} from '@/lib/comparison'
+import { round } from '@/lib/ranking/compute'
+import type { SortKey } from '@/lib/ranking/rank'
+
+export type { Comparison, ComparisonRow, QuoteSnapshot } from '@/lib/comparison'
+export { nearestStandardAmount } from '@/lib/comparison'
 
 /**
- * The bank benchmark now lives in the `bank_benchmarks` table, not in this
- * file. It moved because the savings ledger measures against it, and a figure
- * that a user-facing total depends on needs a row, a date and a provenance
- * note rather than a constant nobody can audit.
+ * The bank benchmark lives in the `bank_benchmarks` table, not in code. It
+ * moved because the savings ledger measures against it, and a figure that a
+ * user-facing total depends on needs a row, a date and a provenance note
+ * rather than a constant nobody can audit.
  *
  * The markup assumptions that generate it, and the weekly refresh, are in
  * lib/proof/benchmarks.ts. /how-we-rank#savings renders the live table.
  */
 
-/** A quote as the UI needs it: provider branding included, numbers pre-computed. */
-export interface ComparisonRow {
-  providerSlug: string
-  providerName: string
-  brandColor: string
-  brandTextColor: string
-  rate: number
-  fee: number
-  amountReceived: number
-  deliverySpeedText: string
-  deliverySpeedMinutes: number | null
-  promo: boolean
-  promoNote: string | null
-  deliveryMethod: DeliveryMethod
-  source: string
-  stale: boolean
-  capturedAt: Date
-  featured: boolean
-  isBenchmark: boolean
-  /** Null for the benchmark row, which never links out. */
-  hasAffiliateLink: boolean
-}
-
-export interface Comparison {
-  /**
-   * True when we could not reach the database at all.
-   *
-   * Distinct from "no rows": an outage must not render as "no provider
-   * delivers to Pakistan this way", which is a false statement about the
-   * market rather than an honest admission that we are broken.
-   */
-  unavailable?: boolean
-  corridorSlug: string
-  /** Needed by the proof layer to attribute a comparison event to a corridor. */
-  corridorId: number | null
-  fromCurrency: SendCurrency
-  currencySymbol: string
-  deliveryMethod: DeliveryMethod
-  /** The amount the user asked for. */
-  amount: number
-  /** The stored grid amount the rates were captured at. See `quotedAtAmount`. */
-  quotedAtAmount: number
-  midMarketRate: number | null
-  rows: RankedQuote<ComparisonRow>[]
-  /** PKR the best provider beats the bank by. Null when no benchmark exists. */
-  savingVsBank: number | null
-  /** Oldest capture time across the rows — drives the "captured 14:28 PKT" line. */
-  capturedAt: Date | null
-  /** True when any row is older than 60 minutes. */
-  stale: boolean
-}
-
-/**
- * Pick the grid amount closest to what the user typed.
- *
- * We refresh at 100/500/1000/2000 rather than on demand, so an arbitrary amount
- * reuses the nearest band's rate and fee and recomputes the received figure for
- * the real amount. Rate and fee are near-flat inside a band; the exception is a
- * promotional rate with a cap, which the adapters already resolve at capture
- * time. The UI shows which band was used so the number is never unexplained.
- */
-export function nearestStandardAmount(currency: SendCurrency, amount: number): number {
-  const grid = STANDARD_AMOUNTS[currency] ?? [100, 500, 1000, 2000]
-  return grid.reduce((best, candidate) =>
-    Math.abs(candidate - amount) < Math.abs(best - amount) ? candidate : best,
-  )
-}
-
 /**
  * Run a read against the database, degrading instead of throwing.
  *
- * Every public page reads through this module. Without it a database blip
- * takes the whole site down with a stack trace — which is exactly what a
- * torn-down local Postgres produced: `ECONNREFUSED` surfaced as a 500 on the
- * home page. The rest of this codebase degrades (a failed adapter becomes a
- * stale badge, a failed send becomes a warning) and the read path should too.
+ * Without this a database blip takes a whole page down with a stack trace. The
+ * rest of this codebase degrades (a failed adapter becomes a stale badge, a
+ * failed send becomes a warning) and the read path should too. Failures are
+ * logged loudly rather than swallowed, and callers distinguish "no rows" from
+ * "could not reach the database" so the UI never states something false about
+ * the market.
  *
- * Failures are logged loudly rather than swallowed, and callers distinguish
- * "no rows" from "could not reach the database" so the UI never states
- * something false about the market.
+ * Except in the static build: there a page that degraded would be published
+ * and served as-is until the next deploy, so a failed read fails the build
+ * and the site keeps serving the last good one.
  */
 async function safeRead<T>(label: string, fallback: T, run: () => Promise<T>): Promise<T> {
   try {
     return await run()
   } catch (error) {
+    if (IN_STATIC_BUILD) throw error
     console.error(`[quotes] ${label} failed:`, error)
     return fallback
   }
 }
 
+async function readLatestMidMarket(currency: SendCurrency): Promise<number | null> {
+  const [row] = await db
+    .select({ rate: midMarketRates.rate })
+    .from(midMarketRates)
+    .where(eq(midMarketRates.fromCurrency, currency))
+    .orderBy(desc(midMarketRates.capturedAt))
+    .limit(1)
+
+  return row ? toNum(row.rate) : null
+}
+
 /** Most recent mid-market rate for a currency. */
 export async function latestMidMarket(currency: SendCurrency): Promise<number | null> {
-  return safeRead(`latestMidMarket(${currency})`, null, async () => {
-    const [row] = await db
-      .select({ rate: midMarketRates.rate })
-      .from(midMarketRates)
-      .where(eq(midMarketRates.fromCurrency, currency))
-      .orderBy(desc(midMarketRates.capturedAt))
-      .limit(1)
-
-    return row ? toNum(row.rate) : null
-  })
+  return safeRead(`latestMidMarket(${currency})`, null, () => readLatestMidMarket(currency))
 }
 
 /**
- * Build the bank benchmark row from the stored benchmark for this corridor.
+ * One corridor's quote snapshot, or null when there is no such active
+ * corridor. Throws if the database cannot be read.
  *
- * Returns null when the corridor has no benchmark recorded. That is a real
- * state, not an error: the table simply shows no comparison row, and
- * `savingVsBank` stays null rather than being measured against a guess.
+ * With `only`, just that method and amount band is read: what one table needs.
+ * Without it, every method and band, which is what /data/quotes/{corridor}.json
+ * serves so the browser can re-rank at any amount and payout.
  */
-function benchmarkRow(
-  benchmark: Benchmark,
-  amount: number,
-  method: DeliveryMethod,
-): ComparisonRow {
+export async function loadQuoteSnapshot(
+  corridorSlug: string,
+  only?: { method: DeliveryMethod; amount: number },
+): Promise<QuoteSnapshot | null> {
+  const [corridor] = await db
+    .select()
+    .from(corridors)
+    .where(and(eq(corridors.slug, corridorSlug), eq(corridors.active, true)))
+    .limit(1)
+  if (!corridor) return null
+
+  const slot = only
+    ? and(
+        eq(latestQuotes.deliveryMethod, only.method),
+        eq(latestQuotes.amountSent, nearestStandardAmount(corridor.fromCurrency, only.amount)),
+      )
+    : undefined
+
+  const [quotes, benchmarks, midMarketRate] = await Promise.all([
+    db
+      .select({
+        providerSlug: providers.slug,
+        providerName: providers.name,
+        brandColor: providers.brandColor,
+        brandTextColor: providers.brandTextColor,
+        featured: providers.featured,
+        affiliateUrlTemplate: providers.affiliateUrlTemplate,
+        deliveryMethod: latestQuotes.deliveryMethod,
+        amountSent: latestQuotes.amountSent,
+        rate: latestQuotes.rate,
+        fee: latestQuotes.fee,
+        deliverySpeedText: latestQuotes.deliverySpeedText,
+        deliverySpeedMinutes: latestQuotes.deliverySpeedMinutes,
+        promo: latestQuotes.promoFlag,
+        promoNote: latestQuotes.promoNote,
+        source: latestQuotes.source,
+        stale: latestQuotes.stale,
+        capturedAt: latestQuotes.capturedAt,
+      })
+      .from(latestQuotes)
+      .innerJoin(providers, eq(latestQuotes.providerId, providers.id))
+      .where(
+        and(
+          eq(latestQuotes.corridorId, corridor.id),
+          eq(providers.active, true),
+          // The benchmark is priced from bank_benchmarks, never from a quote row.
+          eq(providers.isBenchmark, false),
+          slot,
+        ),
+      )
+      // A fixed order, so ranking ties break the same way on every read.
+      .orderBy(latestQuotes.providerId),
+    db
+      .select()
+      .from(bankBenchmarks)
+      .where(
+        and(
+          eq(bankBenchmarks.corridorId, corridor.id),
+          only ? eq(bankBenchmarks.deliveryMethod, only.method) : undefined,
+        ),
+      ),
+    readLatestMidMarket(corridor.fromCurrency),
+  ])
+
   return {
-    providerSlug: 'typical-bank',
-    providerName: 'Bank Transfer',
-    brandColor: '#8A8F8C',
-    brandTextColor: '#FFFFFF',
-    rate: benchmark.rate,
-    fee: benchmark.fee,
-    amountReceived: computeReceived(amount, benchmark.rate, benchmark.fee),
-    deliverySpeedText: '2–4 days',
-    deliverySpeedMinutes: 4320,
-    promo: false,
-    promoNote: null,
-    deliveryMethod: method,
-    source: 'benchmark',
-    stale: false,
-    capturedAt: benchmark.updatedAt,
-    featured: false,
-    isBenchmark: true,
-    hasAffiliateLink: false,
+    corridorSlug: corridor.slug,
+    corridorId: corridor.id,
+    fromCurrency: corridor.fromCurrency,
+    midMarketRate,
+    benchmarks: Object.fromEntries(
+      benchmarks.map((row) => [
+        row.deliveryMethod,
+        { rate: toNum(row.rate), fee: toNum(row.fee), updatedAt: row.updatedAt.getTime() },
+      ]),
+    ),
+    quotes: quotes.map(({ affiliateUrlTemplate, capturedAt, rate, fee, ...quote }) => ({
+      ...quote,
+      rate: toNum(rate),
+      fee: toNum(fee),
+      hasAffiliateLink: Boolean(affiliateUrlTemplate),
+      capturedAt: capturedAt.getTime(),
+    })),
   }
 }
-
-const STALE_AFTER_MS = 60 * 60 * 1000
 
 /**
  * The comparison table for one corridor, method, and amount.
@@ -189,149 +188,40 @@ export async function getComparison(options: {
   sortBy?: SortKey
   includeBenchmark?: boolean
 }): Promise<Comparison | null> {
-  const { corridorSlug, method: selectedMethod = 'bank', sortBy = 'received', includeBenchmark = true } = options
-  // These are named account destinations, not separately quoted payout rails.
-  // Use the bank-deposit quote and benchmark rather than empty legacy slots.
-  const method = selectedMethod === 'neobank' || selectedMethod === 'rda' ? 'bank' : selectedMethod
+  const { corridorSlug } = options
+  const method = quotedMethod(options.method ?? 'bank')
 
-  const config = corridorConfigBySlug(corridorSlug)
-
-  /** Shape returned when the database is unreachable. */
-  const outage = (): Comparison => ({
-    unavailable: true,
-    corridorSlug,
-    corridorId: null,
-    fromCurrency: config?.fromCurrency ?? 'GBP',
-    currencySymbol: CURRENCY_SYMBOLS[config?.fromCurrency ?? 'GBP'],
-    deliveryMethod: method,
-    amount: options.amount ?? defaultAmountFor(config?.fromCurrency ?? 'GBP'),
-    quotedAtAmount: options.amount ?? defaultAmountFor(config?.fromCurrency ?? 'GBP'),
-    midMarketRate: null,
-    rows: [],
-    savingVsBank: null,
-    capturedAt: null,
-    stale: false,
-  })
-
-  const corridorRows = await safeRead(`getComparison(${corridorSlug}) corridor`, null, () =>
-    db
-      .select()
-      .from(corridors)
-      .where(and(eq(corridors.slug, corridorSlug), eq(corridors.active, true)))
-      .limit(1),
+  const snapshot = await safeRead(`getComparison(${corridorSlug})`, undefined, () =>
+    loadQuoteSnapshot(corridorSlug, {
+      method,
+      amount:
+        options.amount ?? defaultAmountFor(corridorConfigBySlug(corridorSlug)?.fromCurrency ?? 'GBP'),
+    }),
   )
 
-  // null means the query threw; an empty array means no such corridor.
-  if (corridorRows === null) return outage()
-  const [corridor] = corridorRows
-  if (!corridor) return null
-
-  const currency = corridor.fromCurrency
-  const amount = options.amount ?? (currency === 'GBP' ? 500 : STANDARD_AMOUNTS[currency][1])
-  const quotedAtAmount = nearestStandardAmount(currency, amount)
-
-  const rows = await safeRead(`getComparison(${corridorSlug}) quotes`, null, () =>
-    db
-      .select({
-        providerSlug: providers.slug,
-        providerName: providers.name,
-        brandColor: providers.brandColor,
-        brandTextColor: providers.brandTextColor,
-        featured: providers.featured,
-        isBenchmark: providers.isBenchmark,
-        affiliateUrlTemplate: providers.affiliateUrlTemplate,
-        rate: latestQuotes.rate,
-        fee: latestQuotes.fee,
-        deliverySpeedText: latestQuotes.deliverySpeedText,
-        deliverySpeedMinutes: latestQuotes.deliverySpeedMinutes,
-        promoFlag: latestQuotes.promoFlag,
-        promoNote: latestQuotes.promoNote,
-        source: latestQuotes.source,
-        stale: latestQuotes.stale,
-        capturedAt: latestQuotes.capturedAt,
-      })
-      .from(latestQuotes)
-      .innerJoin(providers, eq(latestQuotes.providerId, providers.id))
-      .where(
-        and(
-          eq(latestQuotes.corridorId, corridor.id),
-          eq(latestQuotes.deliveryMethod, method),
-          eq(latestQuotes.amountSent, quotedAtAmount),
-          eq(providers.active, true),
-        ),
-      )
-      // A fixed order, so ranking ties break the same way on every read.
-      .orderBy(latestQuotes.providerId),
-  )
-
-  if (rows === null) return outage()
-
-  // Fetched together: both are needed before the rows can be ranked, and the
-  // benchmark is a single indexed lookup.
-  const [midMarket, benchmark] = await Promise.all([
-    latestMidMarket(currency),
-    safeRead(`getBenchmark(${corridor.id}/${method})`, null, () =>
-      getBenchmark(corridor.id, method),
-    ),
-  ])
-
-  const comparisonRows: ComparisonRow[] = rows
-    // The stored benchmark provider is replaced by a live-computed row below.
-    .filter((row) => !row.isBenchmark)
-    .map((row) => {
-      const rate = toNum(row.rate)
-      const fee = toNum(row.fee)
-      return {
-        providerSlug: row.providerSlug,
-        providerName: row.providerName,
-        brandColor: row.brandColor,
-        brandTextColor: row.brandTextColor,
-        rate,
-        fee,
-        // Recomputed for the requested amount rather than reusing the stored
-        // figure, which was calculated at `quotedAtAmount`.
-        amountReceived: computeReceived(amount, rate, fee),
-        deliverySpeedText: row.deliverySpeedText,
-        deliverySpeedMinutes: row.deliverySpeedMinutes,
-        promo: row.promoFlag,
-        promoNote: row.promoNote,
-        deliveryMethod: method,
-        source: row.source,
-        stale: row.stale,
-        capturedAt: row.capturedAt,
-        featured: row.featured,
-        isBenchmark: false,
-        hasAffiliateLink: Boolean(row.affiliateUrlTemplate),
-      }
-    })
-
-  if (includeBenchmark && benchmark !== null && comparisonRows.length > 0) {
-    comparisonRows.push(benchmarkRow(benchmark, amount, method))
+  if (snapshot === undefined) {
+    // The database could not be read: say so rather than show an empty market.
+    const currency = corridorConfigBySlug(corridorSlug)?.fromCurrency ?? 'GBP'
+    const amount = options.amount ?? defaultAmountFor(currency)
+    return {
+      unavailable: true,
+      corridorSlug,
+      corridorId: null,
+      fromCurrency: currency,
+      currencySymbol: CURRENCY_SYMBOLS[currency],
+      deliveryMethod: method,
+      amount,
+      quotedAtAmount: amount,
+      midMarketRate: null,
+      rows: [],
+      savingVsBank: null,
+      capturedAt: null,
+      stale: false,
+    }
   }
+  if (snapshot === null) return null
 
-  const ranked = rankQuotes(comparisonRows, sortBy)
-
-  const captureTimes = comparisonRows.filter((r) => !r.isBenchmark).map((r) => r.capturedAt)
-  const oldest = captureTimes.length
-    ? new Date(Math.min(...captureTimes.map((d) => d.getTime())))
-    : null
-
-  return {
-    corridorSlug: corridor.slug,
-    corridorId: corridor.id,
-    fromCurrency: currency,
-    currencySymbol: CURRENCY_SYMBOLS[currency],
-    deliveryMethod: method,
-    amount,
-    quotedAtAmount,
-    midMarketRate: midMarket,
-    rows: ranked,
-    savingVsBank: savingVsBenchmark(ranked),
-    capturedAt: oldest,
-    stale:
-      comparisonRows.some((r) => r.stale) ||
-      (oldest !== null && Date.now() - oldest.getTime() > STALE_AFTER_MS),
-  }
+  return comparisonFromSnapshot(snapshot, { ...options, method })
 }
 
 export interface RateSeries {

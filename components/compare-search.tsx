@@ -16,9 +16,9 @@ import { detectVisitorCorridor } from '@/lib/visitor-corridor'
  * The search form in the home hero and at the top of /compare.
  *
  * By default it does not fetch anything itself: Compare navigates to /compare
- * with the selection in the query string, and that page renders the ranked
- * results on the server. With `onCompare` it is the live ComparePanel's
- * controls instead: Compare hands the selection back and nothing navigates.
+ * with the selection in the query string, and that page ranks the results.
+ * With `onCompare` it is the live ComparePanel's controls instead: Compare
+ * hands the selection back and nothing navigates.
  */
 
 export interface SearchSelection {
