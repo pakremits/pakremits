@@ -1,74 +1,76 @@
-# PakRemits — database and CI bundle
+# PakRemits — the database
 
-Schema, migrations, seed scripts, and the GitHub Actions refresh workflow.
-This repository contains no production data or credentials.
+The database is Cloudflare D1, which is SQLite. Drizzle describes the schema and
+writes the migrations; wrangler applies them. This repository contains no
+production data or credentials.
 
-## Included files
+## Files
 
-- `drizzle/` — migrations `0000`–`0004` plus Drizzle Kit metadata and snapshots
 - `lib/db/schema.ts` — the Drizzle schema and source of truth
-- `lib/db/index.ts` — the PostgreSQL client and `toNum()` numeric boundary helper
+- `migrations/` — SQL migrations generated from it, applied in order by wrangler
 - `drizzle.config.ts` — Drizzle Kit configuration
-- `scripts/seed.ts` and `scripts/seed-proof-demo.ts` — synthetic seed data
-- `scripts/refresh-local.ts` — local rate refresh entry point
-- `.env.example` — environment template containing placeholders only
-- `.github/workflows/refresh-rates.yml` — scheduled rate refresh workflow
+- `lib/db/index.ts` — the shared `db` for whichever D1 is bound (`bindD1`), and
+  the number helpers `toNum`, `toMoney` and `toRate`
+- `lib/db/d1-http.ts` — a D1 binding over the REST API, for code that runs
+  outside Cloudflare: the refresh and the scripts
+- `lib/db/node.ts` — picks the local database or the real one (`D1_TARGET`)
+- `lib/db/d1-bridge.ts` and `scripts/with-local-d1.ts` — serve the local
+  database to `next build` and `next dev`, whose workers cannot all open the
+  local files at once
+- `lib/quotes-write.ts` — writes the quote history and the latest quotes together
+- `scripts/seed.ts` and `scripts/seed-proof-demo.ts` — starter data
+- `scripts/refresh-local.ts` — the refresh entry point
+- `scripts/db-check.ts` — runs each kind of query once and prints a summary
+
+## Three ways in
+
+| Who | How |
+| --- | --- |
+| The Worker | The `DB` binding in `wrangler.jsonc`, bound for each request |
+| The refresh and scripts | `D1_TARGET=local` (the default): the local files, through wrangler. `D1_TARGET=remote`: the REST API, with `CLOUDFLARE_ACCOUNT_ID`, `D1_DATABASE_ID` and `CLOUDFLARE_D1_TOKEN` from `.env.local` |
+| `next build` | A local copy. Before each build, `publish.yml` exports the real database into it, so the build makes no API calls and every page reads the same snapshot |
 
 ## Set up a database
 
-1. Create a PostgreSQL database in Supabase or run PostgreSQL locally.
-2. Copy `.env.example` to `.env.local` and set `DATABASE_URL` and `DIRECT_URL`.
-   Use the direct connection on port 5432 for `DIRECT_URL`; DDL is unreliable
-   through a transaction pooler on port 6543.
-3. Apply all migrations in order:
+Locally:
 
-   ```bash
-   npm run db:migrate
-   ```
+```bash
+npm run db:migrate:local
+npm run seed
+npm run refresh
+```
 
-4. Populate the database with synthetic starter data:
-
-   ```bash
-   npm run seed
-   ```
-
-5. Fetch current rates:
-
-   ```bash
-   npm run refresh
-   ```
-
-The local application reads rates from PostgreSQL. Cloning the repository or
-extracting the schema archive does not provide the live data another developer
-sees; developers must connect to the same database if they need identical data.
+The real database is created once (see *One-time setup* in
+[README.md](./README.md#one-time-setup)). After that, every publish applies
+pending migrations before it deploys. To run a script against it from your own
+machine, set `D1_TARGET=remote` and the three values above, for example
+`D1_TARGET=remote npm run db:check`.
 
 ## Schema notes
 
-- Sending-currency amounts use `numeric(14,2)`.
-- PKR amounts use `numeric(18,2)`.
-- Rates use `numeric(18,6)`.
-- Drizzle returns PostgreSQL `numeric` values as strings. Parse them at the
-  application boundary with `toNum()` rather than relying on implicit coercion.
-- Migrations `0001_rls.sql` and `0004_proof_rls.sql` configure row-level
-  security. Apply migrations in order and do not skip them.
-- `rate_alerts` contains subscriber contact details in production. The project
-  and seed scripts contain no live subscriber data.
+- SQLite has no decimal type. Money is stored as `real` and rounded to 2 decimal
+  places on the way in (`toMoney`), rates to 6 (`toRate`).
+- Timestamps are integer milliseconds and flags are 0 or 1; Drizzle converts
+  both to `Date` and `boolean`.
+- `latest_quotes` holds the newest quote for each corridor, method, amount and
+  provider, and is what every price on the site reads. `rate_quotes` keeps 45
+  days of history for the admin. `lib/quotes-write.ts` writes both in one
+  batch, so they never disagree.
+- D1 limits to know when writing queries: at most 100 bound parameters per
+  statement (insert in chunks), no interactive transactions (use `db.batch`,
+  which is atomic), and a large `UNION ALL` fails with "too many terms in
+  compound SELECT".
+- Migrations are expand-then-contract: they run before the new code deploys,
+  and a rollback does not undo them.
+- `rate_alerts` holds subscribers' contact details in production. The seed
+  scripts contain no live subscriber data.
 
-## GitHub Actions refresh
+## Backups
 
-`.github/workflows/refresh-rates.yml` runs at 7, 22, 37, and 52 minutes past
-each hour and then asks the deployed site to discard cached quote data. It runs
-the refresh directly because the complete job takes longer than a typical web
-function request and may need Chromium for browser-based adapters.
+- **D1 Time Travel** restores to any point in the last 7 days on the free plan:
+  `npx wrangler d1 time-travel restore pakremits-staging --timestamp <time>`.
+- **A daily export** goes to the private R2 bucket named in `BACKUP_BUCKET`,
+  as `<environment>/<date>/schema.sql` and `data.sql`. To restore one, apply
+  `schema.sql` to an empty database, then `data.sql`.
 
-Configure these values under **Settings → Secrets and variables → Actions**:
-
-| Kind | Name | Notes |
-| --- | --- | --- |
-| Secret | `DATABASE_URL` | Pooled connection to your database |
-| Secret | `CRON_SECRET` | Must match the deployment value |
-| Variable | `SITE_URL` | Leave unset to skip cache revalidation |
-| Variable | `BHEJO_DISABLED_ADAPTERS` | Optional comma-separated adapter list |
-
-The workflow uses `concurrency.cancel-in-progress: false`, so a slow refresh
-queues the following run instead of allowing two jobs to write concurrently.
+Never upload an export as an Actions artifact: the repository is public.

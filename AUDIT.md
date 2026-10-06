@@ -2,6 +2,10 @@
 
 Audit date: 13 September 2026
 
+> A record of the code at that date. The cron, Postgres and Fly.io sections
+> describe the setup the site had before it moved to Cloudflare in October 2026;
+> README.md describes the current one.
+
 ## Outcome
 
 The public route map, API handlers, server actions, database access, provider adapters,

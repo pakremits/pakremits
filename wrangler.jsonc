@@ -46,5 +46,35 @@
     "PUBLISH_REF": "main"
   },
 
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  "env": {
+    // TEMPORARY, for testing the migration branch before it merges: a second
+    // Worker on workers.dev only, against the same staging database. Deployed
+    // by daily.yml on pushes to infra/cloudflare-free; removed with the
+    // branch's last commit.
+    "preview": {
+      "name": "pakremits-preview",
+      "workers_dev": true,
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pakremits-staging",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "vars": {
+        // The deploy passes the workers.dev address with --var. Left empty
+        // here, an alert email fails loudly rather than linking elsewhere.
+        "NEXT_PUBLIC_SITE_URL": "",
+        "ROBOTS_ALLOW_INDEXING": "false",
+        "NEXT_PUBLIC_REFRESH_INTERVAL_MINUTES": "1440",
+        "RESEND_FROM": "PakRemits alerts <alerts@pakremits.com>",
+        "GITHUB_REPOSITORY": "pakremits/pakremits",
+        "PUBLISH_WORKFLOW": "daily.yml",
+        "PUBLISH_REF": "infra/cloudflare-free"
+      }
+    }
+  }
 }

@@ -1,0 +1,46 @@
+name: Daily
+
+# Refreshes the rates and republishes the site from them: once a day on
+# staging (REFRESH_INTERVAL_MINUTES = 1440). The site is static, so a
+# refresh only shows once the site is rebuilt; publish.yml does both.
+#
+# Two schedule ticks, offset from the top of the hour when GitHub's
+# scheduler is busiest, because it can delay or drop a run. publish.yml lets
+# only the first through each day. Production, later, will tick three times a
+# day and refresh every 8 hours.
+#
+# Run by hand to refresh now (force) or, as the admin's Publish now does, to
+# republish edits without a refresh (deploy_only).
+on:
+  schedule:
+    - cron: '7 5 * * *'
+    - cron: '7 11 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Refresh even if the last refresh was recent
+        type: boolean
+        default: false
+      deploy_only:
+        description: Republish from the database without refreshing
+        type: boolean
+        default: false
+  # TEMPORARY: tests the whole pipeline on the preview Worker before the
+  # migration merges. Removed with the branch's last commit.
+  push:
+    branches: [infra/cloudflare-free]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    uses: ./.github/workflows/publish.yml
+    with:
+      environment: ${{ github.ref == 'refs/heads/main' && 'staging' || 'preview' }}
+      refresh: ${{ !(github.event_name == 'workflow_dispatch' && inputs.deploy_only) }}
+      force: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+      # A schedule tick with nothing new to refresh publishes nothing; a push or
+      # a hand-run always publishes.
+      deploy_without_refresh: ${{ github.event_name != 'schedule' }}
+    secrets: inherit

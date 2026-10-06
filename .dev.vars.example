@@ -1,0 +1,17 @@
+# Settings for the Worker under `npm run preview` (wrangler dev). Copy this file
+# to .dev.vars, which is gitignored; values there override the vars in
+# wrangler.jsonc. Deployed Workers get these as vars and secrets instead.
+NEXT_PUBLIC_SITE_URL=http://127.0.0.1:8787
+ROBOTS_ALLOW_INDEXING=false
+NEXT_PUBLIC_REFRESH_INTERVAL_MINUTES=1440
+
+# Any test password for /admin (any username). /admin stays locked while this
+# is empty. Generate one: `openssl rand -base64 24`
+ADMIN_PASSWORD=
+
+# Optional. Without a key, confirmation emails print to the wrangler console.
+RESEND_API_KEY=
+
+# Optional. Outside production an empty value uses Cloudflare's always-pass
+# Turnstile test secret.
+TURNSTILE_SECRET_KEY=
