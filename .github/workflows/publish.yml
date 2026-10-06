@@ -234,39 +234,46 @@ jobs:
           [ "$commit" = "$GITHUB_SHA" ] \
             || { echo "::error::/api/health reports '${commit:-nothing}', expected $GITHUB_SHA"; exit 1; }
 
+          # One server answering with the new commit does not mean all of them
+          # have the new files yet: a first deploy served a 404 for a file it
+          # had just uploaded. So each check gets three tries, 10 seconds
+          # apart, and prints its last answer: the status, then where a
+          # redirect leads.
+          probe() {
+            local answer=""
+            for try in 1 2 3; do
+              answer="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "$SITE_URL$1" || true)"
+              answer="${answer% }"
+              [ "$answer" = "$2" ] && break
+              [ "$try" = 3 ] || sleep 10
+            done
+            echo "$answer $1"
+            [ "$answer" = "$2" ] || { echo "::error::GET $1 answered '$answer', expected '$2'"; return 1; }
+          }
+          fetch() { curl -fsS --max-time 30 --retry 3 --retry-all-errors --retry-delay 5 "$@"; }
+
           for path in / /compare /compare/uk-to-pakistan /gbp-to-pkr /providers /how-we-rank /sitemap.xml /data/quotes/uk.json; do
-            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 --retry 2 --retry-delay 5 "$SITE_URL$path" || true)"
-            echo "$code $path"
-            [ "$code" = 200 ] || { echo "::error::GET $path returned $code"; exit 1; }
+            probe "$path" 200
           done
 
           # The data the pages were built from: quotes, not an empty market.
-          quotes="$(curl -fsS --max-time 30 "$SITE_URL/data/quotes/uk.json" | jq '.quotes | length')"
+          quotes="$(fetch "$SITE_URL/data/quotes/uk.json" | jq '.quotes | length')"
           echo "$quotes UK quotes"
           [ "$quotes" -gt 0 ] || { echo "::error::the UK data file has no quotes"; exit 1; }
 
           # Urdu is switched off: /ur must redirect, temporarily, to English.
-          urdu="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "$SITE_URL/ur" || true)"
-          echo "$urdu /ur"
-          case "$urdu" in "302 $SITE_URL/") ;; *) echo "::error::GET /ur returned '$urdu'"; exit 1 ;; esac
-
+          probe /ur "302 $SITE_URL/"
           # The pre-/compare corridor URLs must keep redirecting permanently.
-          old=/send-money-from-uk-to-pakistan
-          redirect="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "$SITE_URL$old" || true)"
-          echo "$redirect $old"
-          case "$redirect" in
-            "301 $SITE_URL/compare/uk-to-pakistan") ;;
-            *) echo "::error::GET $old returned '$redirect'"; exit 1 ;;
-          esac
+          probe /send-money-from-uk-to-pakistan "301 $SITE_URL/compare/uk-to-pakistan"
 
           # Out of search indexes unless indexing is switched on: a noindex
           # header on every response and the robots meta tag on pages. Output
           # is captured before grepping: `curl | grep -q` can fail under
           # pipefail when grep exits early.
           if [ "${{ vars.ROBOTS_ALLOW_INDEXING }}" != "true" ]; then
-            head="$(curl -fsSI --max-time 30 "$SITE_URL/")"
+            head="$(fetch -I "$SITE_URL/")"
             grep -qi '^x-robots-tag: noindex' <<<"$head" || { echo "::error::home page lost its X-Robots-Tag noindex header"; exit 1; }
-            home="$(curl -fsS --max-time 30 "$SITE_URL/")"
+            home="$(fetch "$SITE_URL/")"
             grep -q 'name="robots" content="noindex' <<<"$home" || { echo "::error::home page lost noindex"; exit 1; }
           fi
 
@@ -278,7 +285,16 @@ jobs:
         if: failure() && steps.smoke.outcome == 'failure'
         run: |
           echo "::error::Smoke test failed; rolling back to the previous version"
-          npx wrangler rollback $ENV_FLAG --message "Smoke test failed for ${GITHUB_SHA::12}" --yes
+          if ! out="$(npx wrangler rollback $ENV_FLAG --message "Smoke test failed for ${GITHUB_SHA::12}" --yes 2>&1)"; then
+            echo "$out"
+            # A Worker's first deployment has no earlier version to go back to.
+            if grep -q 'Could not find stable Worker Version' <<<"$out"; then
+              echo "::warning::Nothing to roll back to: this was the Worker's first deployment, so it stays live"
+              exit 0
+            fi
+            exit 1
+          fi
+          echo "$out"
 
       # This database's share of the free plan's daily D1 allowance, which the
       # whole Cloudflare account shares.
