@@ -183,16 +183,14 @@ Visitor ─► Worker + static assets (Workers Free)
 
 ### Environments
 
-| | Staging | Preview (until the Cloudflare branch merges) |
-| --- | --- | --- |
-| Worker | `pakremits-staging` | `pakremits-preview` (`wrangler … --env preview`) |
-| Address | https://stage.pakremits.com | its `workers.dev` address |
-| Database | D1 `pakremits-staging` | the same database |
-| Published from | `main` | `infra/cloudflare-free` |
-| GitHub environment | `staging` | `preview` |
+Staging is the Worker `pakremits-staging` at https://stage.pakremits.com, with
+the D1 database `pakremits-staging`. It is published from `main` through the
+GitHub environment `staging`, and is the top level of `wrangler.jsonc`.
 
-Production (`pakremits.com`) will be its own Worker and database, with
-`ROBOTS_ALLOW_INDEXING=true` and a faster refresh.
+Production (`pakremits.com`) will be its own Worker and database: a
+`production` env in `wrangler.jsonc` and a GitHub environment of the same name,
+which `publish.yml` pairs up, with `ROBOTS_ALLOW_INDEXING=true` and a faster
+refresh.
 
 ### The pipeline
 
@@ -280,10 +278,8 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    **Workers R2 Storage: Edit**, limited to your account. A second, D1-only
    token for the refresh is optional (`CLOUDFLARE_D1_TOKEN`).
 
-4. **GitHub environments** (**Settings → Environments**): `staging`, deployed
-   from `main` only, and until the migration merges, `preview`, deployed from
-   `infra/cloudflare-free` only. Remove the Fly secrets from `staging`. Each
-   needs:
+4. **The GitHub environment** (**Settings → Environments**): `staging`, with
+   deployments limited to `main`. It needs:
 
    | Kind | Name | Value |
    | --- | --- | --- |
@@ -291,7 +287,7 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    | Secret | `CLOUDFLARE_D1_TOKEN` | Optional D1-only token for the refresh |
    | Secret | `RESEND_API_KEY` | Sends the rate alerts and digests the refresh triggers |
    | Variable | `CLOUDFLARE_ACCOUNT_ID` | The account's id |
-   | Variable | `SITE_URL` | `https://stage.pakremits.com`, or the preview's `workers.dev` address |
+   | Variable | `SITE_URL` | `https://stage.pakremits.com`; the Worker's `workers.dev` address until step 6 |
    | Variable | `REFRESH_INTERVAL_MINUTES` | `1440` |
    | Variable | `TURNSTILE_SITE_KEY` | The public key of a Turnstile widget that lists this site's hostname |
    | Variable | `GTM_ID` | `GTM-N4ZV897G` on staging; unset for none |
@@ -303,8 +299,7 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    every environment that does not set its own, so set `SITE_URL` on each
    environment explicitly.
 
-5. **Worker secrets**, once the first publish has created the Worker. Add
-   `--env preview` for the preview Worker:
+5. **Worker secrets**, once the first publish has created the Worker:
 
    ```bash
    npx wrangler secret put ADMIN_PASSWORD
@@ -316,7 +311,12 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    `GITHUB_DISPATCH_TOKEN` is for the admin's **Publish now**: a fine-grained
    GitHub token for this repository only, with **Actions: Read and write**.
 
-6. **Recommended:** a branch ruleset on `main` requiring a pull request and the
+6. **The address.** Delete any existing DNS record for the hostname, then
+   attach it to the Worker: **Workers & Pages → pakremits-staging → Settings →
+   Domains & Routes → Add → Custom domain**. Cloudflare creates the DNS record
+   and certificate. Then change `SITE_URL` to the new address and publish.
+
+7. **Recommended:** a branch ruleset on `main` requiring a pull request and the
    `verify` and `migrations` checks, with force pushes blocked. Never add path
    filters to `ci.yml`: a required check that never runs blocks the PR.
 

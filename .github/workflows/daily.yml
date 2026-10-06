@@ -25,10 +25,6 @@ on:
         description: Republish from the database without refreshing
         type: boolean
         default: false
-  # TEMPORARY: tests the whole pipeline on the preview Worker before the
-  # migration merges. Removed with the branch's last commit.
-  push:
-    branches: [infra/cloudflare-free]
 
 permissions:
   contents: read
@@ -37,10 +33,10 @@ jobs:
   publish:
     uses: ./.github/workflows/publish.yml
     with:
-      environment: ${{ github.ref == 'refs/heads/main' && 'staging' || 'preview' }}
+      environment: staging
       refresh: ${{ !(github.event_name == 'workflow_dispatch' && inputs.deploy_only) }}
       force: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
-      # A schedule tick with nothing new to refresh publishes nothing; a push or
-      # a hand-run always publishes.
+      # A schedule tick with nothing new to refresh publishes nothing; a
+      # hand-run always publishes.
       deploy_without_refresh: ${{ github.event_name != 'schedule' }}
     secrets: inherit

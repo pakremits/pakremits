@@ -7,14 +7,14 @@ name: Publish
 #   migrations ─► [refresh] ─► export D1 ─► local copy ─► next build ─► deploy ─► smoke
 #                                  └─► backup to R2
 #
-# Everything runs against one GitHub environment (staging, or the temporary
-# preview), whose secrets and variables are listed in README.md.
+# Everything runs against one GitHub environment, whose secrets and variables
+# are listed in README.md.
 
 on:
   workflow_call:
     inputs:
       environment:
-        description: staging, or preview (the migration branch's test Worker)
+        description: The GitHub environment, which names the Worker too (see WRANGLER_ENV)
         type: string
         required: true
       refresh:
@@ -58,8 +58,9 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       SITE_URL: ${{ vars.SITE_URL }}
-      # `wrangler --env preview` for the preview Worker; the top level is staging.
-      WRANGLER_ENV: ${{ inputs.environment == 'preview' && 'preview' || '' }}
+      # Staging is the top level of wrangler.jsonc. Any other environment (a
+      # production one, later) is the wrangler env of the same name.
+      WRANGLER_ENV: ${{ inputs.environment != 'staging' && inputs.environment || '' }}
       NEXT_TELEMETRY_DISABLED: '1'
       NO_COLOR: '1'
     steps:

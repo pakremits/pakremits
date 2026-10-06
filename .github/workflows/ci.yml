@@ -7,9 +7,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    # TEMPORARY: infra/cloudflare-free runs the checks on Linux before its PR
-    # opens (only main publishes). Removed with the branch's last commit.
-    branches: [main, infra/cloudflare-free]
+    branches: [main]
   workflow_dispatch:
 
 # A new push to a PR cancels that PR's previous run. Each push to main gets its

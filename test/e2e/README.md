@@ -12,7 +12,7 @@ npm run e2e
 
 `npm run e2e` starts `npm run preview` (wrangler dev on 127.0.0.1:8787) unless
 one is already running. Set `E2E_BASE_URL` to run against another deployment,
-such as the preview Worker.
+such as staging.
 
 `npm run refresh` takes a few minutes — it walks every corridor, method and
 amount with polite per-host throttling.
