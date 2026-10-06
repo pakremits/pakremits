@@ -1,12 +1,11 @@
 /**
- * A small fixed-window rate limiter, kept in memory per server instance.
+ * A small fixed-window rate limiter, kept in memory per Worker isolate.
  *
- * Enough to stop one client from flooding an endpoint (email sign-ups, the
- * counters behind the public proof figures, admin password guesses). It is
- * per instance and resets on deploy, so it is a brake, not an accounting
- * system: a determined attacker with many IPs is not stopped by it.
- *
- * No Node-only APIs, so the Edge-runtime proxy can use it too.
+ * Enough to stop one client from flooding an endpoint (the clicks and
+ * comparison counts behind the public proof figures). It sees only the
+ * traffic one isolate handles and resets when the isolate does, so it is a
+ * brake, not an accounting system. Limits that must hold everywhere (alert
+ * sign-ups, admin password guesses) count in D1 instead: lib/limits.ts.
  */
 
 interface Bucket {
@@ -46,12 +45,12 @@ export function isLimited(key: string, limit: number): boolean {
 }
 
 /**
- * The client's IP. Fly's proxy sets Fly-Client-IP and overwrites any value a
- * client sends; X-Forwarded-For covers other hosts and local development.
+ * The client's IP. Cloudflare sets CF-Connecting-IP and overwrites any value a
+ * client sends; X-Forwarded-For covers local development.
  */
 export function clientIp(request: Request): string {
   return (
-    request.headers.get('fly-client-ip') ??
+    request.headers.get('cf-connecting-ip') ??
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     'unknown'
   )

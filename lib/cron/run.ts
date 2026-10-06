@@ -18,6 +18,7 @@ import { CORRIDORS } from '@/lib/corridors'
 import { getMidMarketRate } from '@/lib/fx'
 import { pruneOldQuotes, refreshAllRates } from '@/lib/providers/refresh'
 import { evaluateAlerts, pruneUnconfirmedAlerts } from '@/lib/alerts/evaluate'
+import { pruneRateLimits } from '@/lib/limits'
 import { refreshBenchmarks } from '@/lib/proof/benchmarks'
 import { pruneComparisonEvents, rollUpSiteStats } from '@/lib/proof/events'
 import { detectLeaderChanges } from '@/lib/proof/leaders'
@@ -118,6 +119,8 @@ export async function runFullRefresh(job = 'refresh-rates'): Promise<FullRefresh
   try {
     alerts = await evaluateAlerts()
     prunedUnconfirmedAlerts = await pruneUnconfirmedAlerts()
+    // Sign-up and password-guess counters whose windows ended long ago.
+    await pruneRateLimits()
   } catch (error) {
     console.error('[cron] alert evaluation failed:', error)
   }

@@ -1,13 +1,20 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "pakremits-staging",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-01",
+  // node:crypto for alert tokens, and process.env filled from the vars and
+  // secrets below, which the shared code in lib/ reads.
+  "compatibility_flags": ["nodejs_compat"],
 
   // The site: every page, data file and image that `npm run build` writes to
   // out/, served as static assets (free and unlimited on Workers). out/_headers
   // and out/_redirects carry the headers and redirects.
   "assets": {
     "directory": "out",
+    "binding": "ASSETS",
+    // Only these reach the Worker; everything else is a static file.
+    "run_worker_first": ["/api/*", "/go/*", "/alerts/*", "/admin", "/admin/*"],
     // Unknown URLs get out/404.html, with a 404 status.
     "not_found_handling": "404-page",
     // /compare/uk-to-pakistan serves compare/uk-to-pakistan.html.
@@ -24,5 +31,20 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+
+  // Not secret. ADMIN_PASSWORD, RESEND_API_KEY, TURNSTILE_SECRET_KEY and
+  // GITHUB_DISPATCH_TOKEN are secrets (`wrangler secret put`), and GIT_SHA is
+  // set by the deploy. Locally, .dev.vars overrides any of these.
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://stage.pakremits.com",
+    "ROBOTS_ALLOW_INDEXING": "false",
+    "NEXT_PUBLIC_REFRESH_INTERVAL_MINUTES": "1440",
+    "RESEND_FROM": "PakRemits alerts <alerts@pakremits.com>",
+    "GITHUB_REPOSITORY": "pakremits/pakremits",
+    "PUBLISH_WORKFLOW": "daily.yml",
+    "PUBLISH_REF": "main"
+  },
+
+  "observability": { "enabled": true }
 }

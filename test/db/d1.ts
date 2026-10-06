@@ -24,6 +24,7 @@ const TABLES = [
   'mid_market_rates',
   'site_stats_daily',
   'cron_runs',
+  'rate_limits',
   'providers',
   'corridors',
 ]

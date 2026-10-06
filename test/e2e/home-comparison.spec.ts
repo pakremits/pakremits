@@ -32,25 +32,21 @@ async function chooseOption(page: Page, controlId: string, optionName: string) {
 }
 
 /**
- * The panel only re-fetches on Compare: wait for that request's answer, then
- * for the skeleton to give way. Waiting on the response rather than on the
- * skeleton appearing: a fast answer replaces the skeleton before a test could
- * see it.
+ * Compare re-ranks in the browser from the corridor's data file, which loads
+ * once per page, so a click may make no request at all: wait for the skeleton
+ * to give way. The assertions after it poll, because a cached answer can
+ * replace the skeleton before a test could see it.
  */
 async function compare(page: Page) {
-  const skeleton = page.locator('#compare section[aria-busy=true]')
-  await Promise.all([
-    page.waitForResponse((response) => response.url().includes('/api/quotes'), { timeout: 15_000 }),
-    page.locator('#compare button[type=submit]').click(),
-  ])
-  await expect(skeleton).toHaveCount(0, { timeout: 15_000 })
+  await page.locator('#compare button[type=submit]').click()
+  await expect(page.locator('#compare section[aria-busy=true]')).toHaveCount(0, { timeout: 15_000 })
 }
 
 test.beforeEach(async ({ page }) => {
   // The live panel moved off the home page, which now has a search form that
   // hands off to /compare. Corridor pages still carry it in full.
   await page.goto('/compare/uk-to-pakistan')
-  // Wait for the server-rendered table rather than a fixed sleep.
+  // Wait for the table built into the page rather than a fixed sleep.
   // Visible matches only: the desktop column headings carry the same words
   // and are hidden on phones.
   await expect(

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx scripts/with-local-d1.ts next dev",
     "build": "tsx scripts/with-local-d1.ts next build && tsx scripts/write-static-config.ts",
+    "preview": "wrangler dev --port 8787 --ip 127.0.0.1",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",

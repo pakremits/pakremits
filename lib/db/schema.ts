@@ -438,3 +438,16 @@ export const corridorLeaders = sqliteTable('corridor_leaders', {
 export type BankBenchmark = typeof bankBenchmarks.$inferSelect
 export type SavingsLedgerRow = typeof savingsLedger.$inferSelect
 export type SiteStatsDaily = typeof siteStatsDaily.$inferSelect
+
+/**
+ * Fixed-window counters for the limits that must hold across Worker isolates:
+ * alert sign-ups per IP and admin password guesses (lib/limits.ts). Each
+ * isolate's own memory is enough of a brake for clicks and the comparison
+ * beacon, which do not need one more D1 write per request.
+ */
+export const rateLimits = sqliteTable('rate_limits', {
+  /** What is limited and for whom, e.g. `admin-fail:203.0.113.7`. */
+  key: text('key').primaryKey(),
+  windowStart: timestamp('window_start').notNull(),
+  hits: integer('hits').notNull(),
+})
