@@ -50,8 +50,44 @@
     "RESEND_FROM": "PakRemits alerts <alerts@pakremits.com>",
     "GITHUB_REPOSITORY": "pakremits/pakremits",
     "PUBLISH_WORKFLOW": "daily.yml",
-    "PUBLISH_REF": "main"
+    "PUBLISH_REF": "main",
+    "PUBLISH_ENVIRONMENT": "staging"
   },
 
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  "env": {
+    // pakremits.com: its own Worker and database, published by the approved
+    // release in ci.yml and refreshed every 8 hours by daily.yml. Anything
+    // not repeated here (the code, assets, flags) is the same as staging;
+    // wrangler does not inherit bindings or vars, so those are spelled out.
+    "production": {
+      "name": "pakremits",
+      // www.pakremits.com is attached too, and a Cloudflare Redirect Rule
+      // sends it to the bare domain before it reaches the Worker.
+      "routes": [
+        { "pattern": "pakremits.com", "custom_domain": true },
+        { "pattern": "www.pakremits.com", "custom_domain": true }
+      ],
+      "workers_dev": false,
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pakremits-production",
+          "database_id": "15dab109-e20e-4d20-952e-e3c3d4081742",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "vars": {
+        "NEXT_PUBLIC_SITE_URL": "https://pakremits.com",
+        "ROBOTS_ALLOW_INDEXING": "true",
+        "NEXT_PUBLIC_REFRESH_INTERVAL_MINUTES": "480",
+        "RESEND_FROM": "PakRemits alerts <alerts@pakremits.com>",
+        "GITHUB_REPOSITORY": "pakremits/pakremits",
+        "PUBLISH_WORKFLOW": "daily.yml",
+        "PUBLISH_REF": "main",
+        "PUBLISH_ENVIRONMENT": "production"
+      }
+    }
+  }
 }

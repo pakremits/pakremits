@@ -1,22 +1,39 @@
 name: Daily
 
-# Refreshes the rates and republishes the site from them: once a day on
-# staging (REFRESH_INTERVAL_MINUTES = 1440). The site is static, so a
-# refresh only shows once the site is rebuilt; publish.yml does both.
+# Refreshes the rates and republishes each site from them. The sites are
+# static, so a refresh only shows once a site is rebuilt; publish.yml does both.
 #
-# Two schedule ticks, offset from the top of the hour when GitHub's
-# scheduler is busiest, because it can delay or drop a run. publish.yml lets
-# only the first through each day. Production, later, will tick three times a
-# day and refresh every 8 hours.
+#   staging     once a day (REFRESH_INTERVAL_MINUTES = 1440): 05:07 and a spare
+#               at 11:07
+#   production  every 8 hours (480): 05:07, 13:07, 21:07, each with a spare
+#               two hours later
+#
+# GitHub's scheduler can delay a tick by hours or drop it, hence the spares.
+# publish.yml refreshes only when five sixths of the interval have passed
+# since the last refresh, so a spare does nothing when its tick ran. Ticks
+# are offset from the top of the hour, when the scheduler is busiest.
+#
+# Production republishes the code it is already serving, never main's tip:
+# new code reaches it only through the approved release in ci.yml.
 #
 # Run by hand to refresh now (force) or, as the admin's Publish now does, to
 # republish edits without a refresh (deploy_only).
 on:
   schedule:
     - cron: '7 5 * * *'
+    - cron: '7 7 * * *'
     - cron: '7 11 * * *'
+    - cron: '7 13 * * *'
+    - cron: '7 15 * * *'
+    - cron: '7 21 * * *'
+    - cron: '7 23 * * *'
   workflow_dispatch:
     inputs:
+      environment:
+        description: Which site
+        type: choice
+        options: [staging, production]
+        default: staging
       force:
         description: Refresh even if the last refresh was recent
         type: boolean
@@ -30,7 +47,10 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  staging:
+    if: >-
+      (github.event_name == 'schedule' && contains(fromJSON('["7 5 * * *", "7 11 * * *"]'), github.event.schedule))
+      || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
     uses: ./.github/workflows/publish.yml
     with:
       environment: staging
@@ -38,5 +58,18 @@ jobs:
       force: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
       # A schedule tick with nothing new to refresh publishes nothing; a
       # hand-run always publishes.
+      deploy_without_refresh: ${{ github.event_name != 'schedule' }}
+    secrets: inherit
+
+  production:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule != '7 11 * * *')
+      || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production')
+    uses: ./.github/workflows/publish.yml
+    with:
+      environment: production
+      code: live
+      refresh: ${{ !(github.event_name == 'workflow_dispatch' && inputs.deploy_only) }}
+      force: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
       deploy_without_refresh: ${{ github.event_name != 'schedule' }}
     secrets: inherit

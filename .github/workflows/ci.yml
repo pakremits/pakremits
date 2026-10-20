@@ -116,3 +116,38 @@ jobs:
       environment: staging
       refresh: false
     secrets: inherit
+
+  # Production takes only what someone approves, once staging has passed its
+  # smoke test with it. The gate is the required reviewer on the
+  # production-release environment. The production environment itself has
+  # none, so its scheduled refreshes run unattended (and republish the code
+  # already live, never this). Approving an old run after main has moved on
+  # publishes nothing: the newer run carries the newer code.
+  release:
+    needs: publish-staging
+    runs-on: ubuntu-latest
+    environment: production-release
+    outputs:
+      current: ${{ steps.guard.outputs.current }}
+    steps:
+      - name: Is this commit still main's tip?
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main is now at $head; approve its run instead"
+          fi
+
+  # The first release to an empty database seeds it and refreshes first.
+  publish-production:
+    needs: release
+    if: needs.release.outputs.current == 'true'
+    uses: ./.github/workflows/publish.yml
+    with:
+      environment: production
+      refresh: false
+    secrets: inherit

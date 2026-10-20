@@ -29,6 +29,14 @@ on:
         description: Publish even when the refresh is skipped (new code, not just new rates)
         type: boolean
         default: true
+      code:
+        description: >-
+          "this" publishes the commit that started the run. "live" republishes
+          the commit the site already serves (from /api/health), so a refresh
+          never ships code that has not been released there; with nothing live
+          yet, the run does nothing.
+        type: string
+        default: this
 
 permissions:
   contents: read
@@ -70,20 +78,43 @@ jobs:
           : "${CLOUDFLARE_ACCOUNT_ID:?variable CLOUDFLARE_ACCOUNT_ID is missing from the ${{ inputs.environment }} environment}"
           : "${SITE_URL:?variable SITE_URL is missing from the ${{ inputs.environment }} environment}"
 
+      # CODE_SHA is the commit this run builds, deploys and smoke-tests.
+      - name: Choose the code
+        env:
+          CODE: ${{ inputs.code }}
+        run: |
+          if [ "$CODE" = live ]; then
+            sha="$(curl -fsS --max-time 20 --retry 3 --retry-all-errors --retry-delay 5 "$SITE_URL/api/health" | jq -r '.commit // empty' || true)"
+            if [ -z "$sha" ]; then
+              echo "::notice::$SITE_URL serves no release yet, so there is nothing to republish"
+              echo "SKIP=1" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Republishing the live commit $sha"
+          else
+            sha="$GITHUB_SHA"
+          fi
+          echo "CODE_SHA=$sha" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v7
+        if: env.SKIP != '1'
         with:
+          ref: ${{ env.CODE_SHA }}
           persist-credentials: false
 
       - uses: actions/setup-node@v7
+        if: env.SKIP != '1'
         with:
           node-version: 22.19.0
           cache: npm
 
       - run: npm ci --no-audit --no-fund
+        if: env.SKIP != '1'
 
       # The database is the one wrangler.jsonc binds as DB for this
       # environment, so its id lives in one place.
       - name: Wrangler flags and the database id
+        if: env.SKIP != '1'
         run: |
           flag="${WRANGLER_ENV:+--env $WRANGLER_ENV}"
           id="$(npx wrangler d1 info DB $flag --json | jq -r .uuid)"
@@ -96,6 +127,7 @@ jobs:
 
       # Expand-only migrations, so code still running reads the new schema fine.
       - name: Apply pending migrations
+        if: env.SKIP != '1'
         run: npx wrangler d1 migrations apply DB --remote $ENV_FLAG
 
       # Whether to refresh, and whether to publish at all. Spare schedule ticks
@@ -104,6 +136,7 @@ jobs:
       # without doing anything, while a late tick still refreshes.
       - name: Plan
         id: plan
+        if: env.SKIP != '1'
         env:
           INTERVAL_MINUTES: ${{ vars.REFRESH_INTERVAL_MINUTES || '1440' }}
         run: |
@@ -214,11 +247,11 @@ jobs:
           NODE_ENV: production
         run: |
           npx wrangler deploy $ENV_FLAG \
-            --var "GIT_SHA:$GITHUB_SHA" \
+            --var "GIT_SHA:$CODE_SHA" \
             --var "NEXT_PUBLIC_SITE_URL:$SITE_URL" \
             --var "ROBOTS_ALLOW_INDEXING:${{ vars.ROBOTS_ALLOW_INDEXING || 'false' }}" \
             --var "NEXT_PUBLIC_REFRESH_INTERVAL_MINUTES:${{ vars.REFRESH_INTERVAL_MINUTES || '1440' }}" \
-            --message "${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER} ${GITHUB_SHA::12}"
+            --message "${GITHUB_WORKFLOW} #${GITHUB_RUN_NUMBER} ${CODE_SHA::12}"
 
       # GET requests only. Never /go/* or /api/events: they write the clicks
       # and comparison counts behind the site's public figures.
@@ -229,11 +262,11 @@ jobs:
           commit=""
           for _ in $(seq 1 24); do
             commit="$(curl -fsS --max-time 10 "$SITE_URL/api/health" | jq -r '.commit // empty' || true)"
-            [ "$commit" = "$GITHUB_SHA" ] && break
+            [ "$commit" = "$CODE_SHA" ] && break
             sleep 5
           done
-          [ "$commit" = "$GITHUB_SHA" ] \
-            || { echo "::error::/api/health reports '${commit:-nothing}', expected $GITHUB_SHA"; exit 1; }
+          [ "$commit" = "$CODE_SHA" ] \
+            || { echo "::error::/api/health reports '${commit:-nothing}', expected $CODE_SHA"; exit 1; }
 
           # One server answering with the new commit does not mean all of them
           # have the new files yet: a first deploy served a 404 for a file it
@@ -276,9 +309,18 @@ jobs:
             grep -qi '^x-robots-tag: noindex' <<<"$head" || { echo "::error::home page lost its X-Robots-Tag noindex header"; exit 1; }
             home="$(fetch "$SITE_URL/")"
             grep -q 'name="robots" content="noindex' <<<"$home" || { echo "::error::home page lost noindex"; exit 1; }
+          else
+            # And the other way round: a stray noindex would take the live
+            # site out of search.
+            head="$(fetch -I "$SITE_URL/")"
+            ! grep -qi '^x-robots-tag: .*noindex' <<<"$head" || { echo "::error::home page sends X-Robots-Tag noindex"; exit 1; }
+            home="$(fetch "$SITE_URL/")"
+            ! grep -q 'name="robots" content="noindex' <<<"$home" || { echo "::error::home page carries noindex"; exit 1; }
+            robots="$(fetch "$SITE_URL/robots.txt")"
+            grep -qi "^sitemap: $SITE_URL/sitemap.xml" <<<"$robots" || { echo "::error::robots.txt does not list the sitemap"; exit 1; }
           fi
 
-          echo "Deployed \`${GITHUB_SHA::12}\` to $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed \`${CODE_SHA::12}\` to $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
 
       # Code and assets only: the database keeps whatever this run wrote, which
       # expand-only migrations make safe for the previous version to read.
@@ -286,7 +328,7 @@ jobs:
         if: failure() && steps.smoke.outcome == 'failure'
         run: |
           echo "::error::Smoke test failed; rolling back to the previous version"
-          if ! out="$(npx wrangler rollback $ENV_FLAG --message "Smoke test failed for ${GITHUB_SHA::12}" --yes 2>&1)"; then
+          if ! out="$(npx wrangler rollback $ENV_FLAG --message "Smoke test failed for ${CODE_SHA::12}" --yes 2>&1)"; then
             echo "$out"
             # A Worker's first deployment has no earlier version to go back to.
             if grep -q 'Could not find stable Worker Version' <<<"$out"; then

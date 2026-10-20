@@ -187,17 +187,25 @@ Staging is the Worker `pakremits-staging` at https://stage.pakremits.com, with
 the D1 database `pakremits-staging`. It is published from `main` through the
 GitHub environment `staging`, and is the top level of `wrangler.jsonc`.
 
-Production (`pakremits.com`) will be its own Worker and database: a
-`production` env in `wrangler.jsonc` and a GitHub environment of the same name,
-which `publish.yml` pairs up, with `ROBOTS_ALLOW_INDEXING=true` and a faster
-refresh.
+Production is the Worker `pakremits` at https://pakremits.com, with its own D1
+database `pakremits-production`: the `production` env in `wrangler.jsonc` and
+the GitHub environment of the same name, which `publish.yml` pairs up. It is
+indexed (`ROBOTS_ALLOW_INDEXING=true`) and refreshes every 8 hours.
+`www.pakremits.com` is attached too and redirects to the bare domain.
+
+Production only runs code someone has approved. Every merge to `main`
+publishes staging; once staging passes its smoke test, the `release` job waits
+on the `production-release` environment's required reviewer, and approving it
+publishes the same commit to production. Production's scheduled refreshes
+republish the commit already live (`code: live`, read from `/api/health`),
+never `main`'s tip, so an unapproved merge cannot slip out with fresh rates.
 
 ### The pipeline
 
 | Workflow | Runs on | What it does |
 | --- | --- | --- |
-| `ci.yml` | PRs into `main`, pushes to `main` | `verify`: typecheck, lint, tests, a full static build on a seeded local database, and the Worker's bundle. `migrations`: applies every migration to an empty database, checks a second run applies nothing, and fails if `lib/db/schema.ts` has a change with no migration. On `main`, once both pass and the commit is still `main`'s tip, it publishes staging with the rates already in the database. |
-| `daily.yml` | 05:07 and 11:07 UTC, or by hand | Refreshes the rates and publishes. The first tick each day does the work; the second only runs if the first did not, since GitHub's scheduler can drop a run. By hand, `force` refreshes even if one ran recently and `deploy_only` republishes without a refresh, which is what the admin's **Publish now** runs. |
+| `ci.yml` | PRs into `main`, pushes to `main` | `verify`: typecheck, lint, tests, a full static build on a seeded local database, and the Worker's bundle. `migrations`: applies every migration to an empty database, checks a second run applies nothing, and fails if `lib/db/schema.ts` has a change with no migration. On `main`, once both pass and the commit is still `main`'s tip, it publishes staging with the rates already in the database, then waits for approval to publish production. |
+| `daily.yml` | Staging 05:07 and 11:07 UTC; production 05:07, 13:07 and 21:07 UTC, each with a spare two hours later; or by hand | Refreshes the rates and publishes. A spare tick does nothing unless its tick was dropped or delayed, which GitHub's scheduler does. By hand, `force` refreshes even if one ran recently and `deploy_only` republishes without a refresh, which is what the admin's **Publish now** runs. |
 | `publish.yml` | Called by both | The one way a release goes live, below. |
 
 `publish.yml` runs one release at a time per environment, queued and never
@@ -217,7 +225,8 @@ cancelled halfway:
 5. **Deploys** the Worker and the site with `wrangler deploy`.
 6. **Smoke-tests** the result. It waits for `/api/health` to report the new
    commit, checks the main pages and a data file return 200 with quotes in it,
-   that `/ur` and an old URL redirect, and that staging still refuses indexing.
+   that `/ur` and an old URL redirect, and that staging refuses indexing while
+   production allows it and lists its sitemap.
    It sends GET requests only and never touches `/go/*` or `/api/events`, which
    record the clicks and comparisons behind the public figures.
 7. **Rolls back** with `wrangler rollback` if the smoke test fails. The job
@@ -244,9 +253,9 @@ on it reads that one value:
 - `publish.yml`'s skip gate, which refreshes only once five sixths of an
   interval have passed since the last refresh.
 
-Staging refreshes once a day, which keeps D1 well inside its free daily write
-allowance. Production will start at three a day (480, with a schedule tick
-every 8 hours and spares). Revisit both at about 1,000 users a month.
+Staging refreshes once a day (1440) and production three times a day (480).
+Both stay well inside D1's free daily write allowance. Revisit at about 1,000
+users a month.
 
 ### One-time setup
 
@@ -320,6 +329,23 @@ Done by the Cloudflare account's owner. Workers Free is enough.
 7. **Recommended:** a branch ruleset on `main` requiring a pull request and the
    `verify` and `migrations` checks, with force pushes blocked. Never add path
    filters to `ci.yml`: a required check that never runs blocks the PR.
+
+#### Production
+
+The same steps, for the `production` env, plus a release gate:
+
+- **GitHub environment `production`**, deployments limited to `main`: the same
+  secret, `SITE_URL=https://pakremits.com`, `REFRESH_INTERVAL_MINUTES=480`,
+  `ROBOTS_ALLOW_INDEXING=true`, the production Turnstile key, and `GTM_ID`. No
+  required reviewers here, or every scheduled refresh would wait for one.
+- **GitHub environment `production-release`**, deployments limited to `main`,
+  with yourself as a **required reviewer**. Nothing else; it is only the gate.
+- **A Turnstile widget** for `pakremits.com` and `www.pakremits.com`.
+- **DNS:** delete any record for `pakremits.com` and `www` before the first
+  release; the deploy attaches both.
+- **A Redirect Rule** (Rules → Redirect Rules → template *Redirect from WWW to
+  root*), so `www` answers with a 301 before the Worker.
+- **Worker secrets** with `--env production`, after the first release.
 
 ### By hand
 
