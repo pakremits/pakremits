@@ -31,10 +31,17 @@ function required(name: string): string {
   return value
 }
 
-/** The local D1 through wrangler, in this process. Dispose of it when done. */
+/**
+ * The local D1 through wrangler, in this process. Dispose of it when done.
+ *
+ * WRANGLER_ENV picks the wrangler.jsonc env, as `--env` does on the command
+ * line: each env's database has its own local copy, and publish.yml builds
+ * production from the copy it loaded with `--env production`.
+ */
 export async function openLocalD1() {
   const { getPlatformProxy } = await import('wrangler')
   return getPlatformProxy<{ DB: D1Database }>({
+    environment: process.env.WRANGLER_ENV || undefined,
     // The local database only, even if the config ever marks it remote.
     remoteBindings: false,
     // Only the D1 binding is used; keep .env secrets out of the local runtime.
