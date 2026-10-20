@@ -280,4 +280,20 @@ describe('admin', () => {
     expect(response.status).toBe(400)
     expect((await response.json()).message).toBe('The template must use https.')
   })
+
+  it('publishes the site this Worker serves', async () => {
+    vi.stubEnv('GITHUB_DISPATCH_TOKEN', 'test-dispatch-token')
+    vi.stubEnv('PUBLISH_ENVIRONMENT', 'production')
+    const dispatch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', dispatch)
+
+    const response = await request('/admin/api/publish', { method: 'POST', headers: basic(PASSWORD) })
+    expect(await response.json()).toMatchObject({ ok: true })
+    const [url, init] = dispatch.mock.calls[0]!
+    expect(url).toBe('https://api.github.com/repos/pakremits/pakremits/actions/workflows/daily.yml/dispatches')
+    expect(JSON.parse(String(init?.body))).toEqual({
+      ref: 'main',
+      inputs: { environment: 'production', deploy_only: 'true' },
+    })
+  })
 })

@@ -137,7 +137,11 @@ async function publish(): Promise<Response> {
       'user-agent': 'pakremits-admin',
       'x-github-api-version': '2022-11-28',
     },
-    body: JSON.stringify({ ref: process.env.PUBLISH_REF ?? 'main', inputs: { deploy_only: 'true' } }),
+    body: JSON.stringify({
+      ref: process.env.PUBLISH_REF ?? 'main',
+      // daily.yml publishes the site this Worker serves.
+      inputs: { environment: process.env.PUBLISH_ENVIRONMENT ?? 'staging', deploy_only: 'true' },
+    }),
   })
 
   if (response.status !== 204) {
