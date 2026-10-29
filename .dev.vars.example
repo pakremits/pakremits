@@ -15,3 +15,6 @@ RESEND_API_KEY=
 # Optional. Outside production an empty value uses Cloudflare's always-pass
 # Turnstile test secret.
 TURNSTILE_SECRET_KEY=
+
+# The staging site lock (worker/site-lock.ts) stays off locally.
+SITE_LOCKED=false

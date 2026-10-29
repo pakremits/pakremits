@@ -19,9 +19,10 @@ export const metadata: Metadata = {
     title: 'Compare money transfers to Pakistan | PakRemits',
     description:
       'Every major service sending to Pakistan, ranked by the exact rupees that land in the account.',
+    // Indexed as /compare: the canonical drops the query string, so the
+    // ?from=…&to=… variants fold into this one page.
     path: '/compare',
   }),
-  robots: { index: false, follow: true },
 }
 
 export default async function ComparePage() {

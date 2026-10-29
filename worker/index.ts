@@ -33,6 +33,7 @@ import type { Env, WorkerContext } from './env'
 import { handleEvent } from './events'
 import { handleGo } from './go'
 import { json, withSiteHeaders } from './http'
+import { siteLock } from './site-lock'
 
 async function route(request: Request, url: URL, env: Env, ctx: WorkerContext): Promise<Response> {
   const { pathname } = url
@@ -78,7 +79,8 @@ const worker = {
     bindD1(env.DB)
     const url = new URL(request.url)
     try {
-      return withSiteHeaders(await route(request, url, env, ctx), url)
+      const refusal = await siteLock(request, url)
+      return withSiteHeaders(refusal ?? (await route(request, url, env, ctx)), url)
     } catch (error) {
       console.error(`[worker] ${request.method} ${url.pathname} failed:`, error)
       return withSiteHeaders(json({ error: 'Something went wrong.' }, 500), url)

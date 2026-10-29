@@ -20,8 +20,9 @@
   "assets": {
     "directory": "out",
     "binding": "ASSETS",
-    // Only these reach the Worker; everything else is a static file.
-    "run_worker_first": ["/api/*", "/go/*", "/alerts/*", "/admin", "/admin/*"],
+    // Staging is password-protected (worker/site-lock.ts), so every request
+    // reaches the Worker first. Production lists only the paths that need it.
+    "run_worker_first": true,
     // Unknown URLs get out/404.html, with a 404 status.
     "not_found_handling": "404-page",
     // /compare/uk-to-pakistan serves compare/uk-to-pakistan.html.
@@ -51,7 +52,10 @@
     "GITHUB_REPOSITORY": "pakremits/pakremits",
     "PUBLISH_WORKFLOW": "daily.yml",
     "PUBLISH_REF": "main",
-    "PUBLISH_ENVIRONMENT": "staging"
+    "PUBLISH_ENVIRONMENT": "staging",
+    // The whole site behind SITE_PASSWORD (a Worker secret). Locally,
+    // .dev.vars turns it off.
+    "SITE_LOCKED": "true"
   },
 
   "observability": { "enabled": true },
@@ -70,6 +74,14 @@
         { "pattern": "www.pakremits.com", "custom_domain": true }
       ],
       "workers_dev": false,
+      // Public, so pages stay static: only these paths reach the Worker.
+      "assets": {
+        "directory": "out",
+        "binding": "ASSETS",
+        "run_worker_first": ["/api/*", "/go/*", "/alerts/*", "/admin", "/admin/*"],
+        "not_found_handling": "404-page",
+        "html_handling": "auto-trailing-slash"
+      },
       "d1_databases": [
         {
           "binding": "DB",
@@ -86,7 +98,8 @@
         "GITHUB_REPOSITORY": "pakremits/pakremits",
         "PUBLISH_WORKFLOW": "daily.yml",
         "PUBLISH_REF": "main",
-        "PUBLISH_ENVIRONMENT": "production"
+        "PUBLISH_ENVIRONMENT": "production",
+        "SITE_LOCKED": "false"
       }
     }
   }

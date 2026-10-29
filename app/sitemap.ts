@@ -13,8 +13,7 @@ import { methodPath } from '@/lib/routes'
  *
  * Lists every canonical public page worth indexing. Private alert URLs,
  * admin/API routes, affiliate redirects, the internal rewrite targets and the
- * thin provider and head-to-head pages (served noindex, see lib/coverage.ts)
- * stay out.
+ * thin head-to-head pages (served noindex, see lib/coverage.ts) stay out.
  *
  * `lastModified` is only given where it is true: pages built on live quotes
  * changed when the newest quote was captured. Static pages carry none rather
@@ -39,6 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${SITE}/`, lastModified: quotedAt, changeFrequency: 'daily', priority: 1 },
+    { url: `${SITE}/compare`, lastModified: quotedAt, changeFrequency: 'daily', priority: 0.8 },
     { url: `${SITE}/how-we-rank`, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${SITE}/providers`, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${SITE}/about`, changeFrequency: 'yearly', priority: 0.3 },
@@ -69,22 +69,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }))
 
   /**
-   * Provider pages for services with a live quote somewhere. Catalogue-only
-   * providers keep their page, served noindex, but are not submitted.
+   * Every provider page, quoted live or not: people search for providers by
+   * name. Only the quoted ones changed with the newest quote.
    */
   const providerRows = await db
     .select({ slug: providers.slug })
     .from(providers)
     .where(and(eq(providers.active, true), eq(providers.isBenchmark, false)))
 
-  const providerPages: MetadataRoute.Sitemap = providerRows
-    .filter((row) => (coverage.get(row.slug)?.size ?? 0) > 0)
-    .map((row) => ({
-      url: `${SITE}/providers/${row.slug}`,
-      lastModified: quotedAt,
-      changeFrequency: 'daily' as const,
-      priority: 0.5,
-    }))
+  const providerPages: MetadataRoute.Sitemap = providerRows.map((row) => ({
+    url: `${SITE}/providers/${row.slug}`,
+    ...((coverage.get(row.slug)?.size ?? 0) > 0 ? { lastModified: quotedAt } : {}),
+    changeFrequency: 'daily' as const,
+    priority: 0.5,
+  }))
 
   /**
    * Head-to-head pages: only pairs quoted together in at least

@@ -64,10 +64,10 @@ export async function generateMetadata({
   if (!provider) return {}
 
   const availability = providerAvailability(slug)
-  // No live quote anywhere: the page is mostly "not available" rows.
-  const coverage = await getProviderCoverage()
-  const quoted = (coverage.get(slug)?.size ?? 0) > 0
 
+  // Indexed whether or not the provider has a live quote: people search for
+  // providers by name, and the page says where it sends from and how it pays
+  // out even without a price.
   return publicPageMetadata({
     // Not "money transfer rates": several names already end in "Money
     // Transfer" or "Exchange", which made the title repeat itself.
@@ -76,7 +76,6 @@ export async function generateMetadata({
       ? `See which countries ${provider.name} sends money to Pakistan from, the payout methods it supports, and how its live rates compare with other services.`
       : `Compare ${provider.name}'s exchange rate and fees for sending money to Pakistan with other services, and see exactly how many rupees arrive.`,
     path: `/providers/${slug}`,
-    index: quoted,
   })
 }
 

@@ -297,3 +297,42 @@ describe('admin', () => {
     })
   })
 })
+
+describe('the staging site lock', () => {
+  beforeEach(() => {
+    vi.stubEnv('SITE_LOCKED', 'true')
+    vi.stubEnv('SITE_PASSWORD', 'test-site-password')
+  })
+
+  it('asks for the password on every page, data file and API', async () => {
+    for (const path of ['/', '/compare/uk-to-pakistan', '/data/quotes/uk.json', '/api/health', '/robots.txt']) {
+      const response = await request(path)
+      expect(response.status, path).toBe(401)
+      expect(response.headers.get('www-authenticate'), path).toContain('PakRemits staging')
+      expect(response.headers.get('x-robots-tag'), path).toContain('noindex')
+    }
+  })
+
+  it('lets the site password, or the admin one, through', async () => {
+    expect(await (await request('/', { headers: basic('test-site-password') })).text()).toBe('asset /')
+    expect(await (await request('/', { headers: basic(PASSWORD) })).text()).toBe('asset /')
+    expect((await request('/', { headers: basic('wrong') })).status).toBe(401)
+  })
+
+  it('leaves /admin to its own password', async () => {
+    const admin = await request('/admin', { headers: basic('test-site-password') })
+    expect(admin.headers.get('www-authenticate')).toContain('PakRemits admin')
+  })
+
+  it('locks an IP out after ten wrong passwords', async () => {
+    for (let i = 0; i < 10; i++) await request('/', { headers: basic('wrong') })
+    expect((await request('/', { headers: basic('test-site-password') })).status).toBe(429)
+  })
+
+  it('refuses everything when the password is missing, and is off unless locked', async () => {
+    vi.stubEnv('SITE_PASSWORD', '')
+    expect((await request('/')).status).toBe(503)
+    vi.stubEnv('SITE_LOCKED', 'false')
+    expect(await (await request('/')).text()).toBe('asset /')
+  })
+})
