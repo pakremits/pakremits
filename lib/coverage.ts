@@ -1,13 +1,14 @@
 /**
  * Which providers are actually quoted in which corridors, for deciding which
- * provider and head-to-head pages are worth indexing.
+ * head-to-head pages are worth indexing.
  *
- * A provider page with no live quote, or a head-to-head where the two services
- * meet in a single corridor, is mostly "not available" rows. Pages like that
- * are thin to a search engine and drag down how it rates the rest of the site,
- * so they are served with noindex, left out of the sitemap and not linked as
- * comparisons. The sitemap, the page metadata and the internal links all read
- * this one source, so they always agree.
+ * A head-to-head where the two services meet in a single corridor is mostly
+ * "not available" rows. Pages like that are thin to a search engine and drag
+ * down how it rates the rest of the site, so they are served with noindex,
+ * left out of the sitemap and not linked as comparisons. The sitemap, the page
+ * metadata and the internal links all read this one source, so they always
+ * agree. (Provider pages are indexed either way: people search for them by
+ * name.)
  *
  * Measured the way those pages measure it: bank deposit at each corridor's
  * default amount. `cache` shares one result between a page's metadata and its

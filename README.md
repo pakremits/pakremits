@@ -326,6 +326,13 @@ Done by the Cloudflare account's owner. Workers Free is enough.
    `GITHUB_DISPATCH_TOKEN` is for the admin's **Publish now**: a fine-grained
    GitHub token for this repository only, with **Actions: Read and write**.
 
+   Staging is private: `SITE_LOCKED=true` in `wrangler.jsonc` puts the whole
+   site behind HTTP Basic auth (`worker/site-lock.ts`), so search engines see
+   only 401s. Set its password as the Worker secret `SITE_PASSWORD`
+   (`npx wrangler secret put SITE_PASSWORD`) **and** as a secret of the same
+   name on the `staging` GitHub environment, which the smoke test uses. Until
+   the Worker secret is set, staging refuses every request.
+
 7. **Recommended:** a branch ruleset on `main` requiring a pull request and the
    `verify` and `migrations` checks, with force pushes blocked. Never add path
    filters to `ci.yml`: a required check that never runs blocks the PR.

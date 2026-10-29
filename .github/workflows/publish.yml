@@ -78,6 +78,19 @@ jobs:
           : "${CLOUDFLARE_ACCOUNT_ID:?variable CLOUDFLARE_ACCOUNT_ID is missing from the ${{ inputs.environment }} environment}"
           : "${SITE_URL:?variable SITE_URL is missing from the ${{ inputs.environment }} environment}"
 
+      # A password-protected site (staging: worker/site-lock.ts) needs it on
+      # every check this job makes. A netrc entry scopes it to the site's own
+      # host, and curl reads it for every call through ~/.curlrc.
+      - name: Site password for the checks
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          [ -n "$SITE_PASSWORD" ] || { echo "No site password: the site is public"; exit 0; }
+          host="$(sed -E 's#^https?://([^/:]+).*#\1#' <<<"$SITE_URL")"
+          umask 077
+          printf 'machine %s login checks password %s\n' "$host" "$SITE_PASSWORD" > ~/.netrc
+          echo 'netrc-optional' > ~/.curlrc
+
       # CODE_SHA is the commit this run builds, deploys and smoke-tests.
       - name: Choose the code
         env:
