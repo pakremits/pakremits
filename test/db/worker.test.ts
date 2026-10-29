@@ -284,7 +284,9 @@ describe('admin', () => {
   it('publishes the site this Worker serves', async () => {
     vi.stubEnv('GITHUB_DISPATCH_TOKEN', 'test-dispatch-token')
     vi.stubEnv('PUBLISH_ENVIRONMENT', 'production')
-    const dispatch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(null, { status: 204 }))
+    const dispatch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+      async () => new Response(null, { status: 204 }),
+    )
     vi.stubGlobal('fetch', dispatch)
 
     const response = await request('/admin/api/publish', { method: 'POST', headers: basic(PASSWORD) })

@@ -291,6 +291,9 @@ jobs:
             for try in 1 2 3; do
               answer="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 "$SITE_URL$1" || true)"
               answer="${answer% }"
+              # With a site password, curl writes it into the redirect URL
+              # (https://user:password@host/); compare the plain address.
+              answer="$(sed -E 's#://[^/@]+@#://#' <<<"$answer")"
               [ "$answer" = "$2" ] && break
               [ "$try" = 3 ] || sleep 10
             done
