@@ -80,7 +80,7 @@ export async function SiteHeader({
   /* The brand-sheet logo, teal and gold, in both themes: the teal still reads
      on the dark bar. Inline SVG so it can build itself on the first page load
      (components/animated-logo.tsx). The drawer's copy is always still. */
-  const logoSize = 'aspect-[5/1] h-6 w-auto sm:h-9 lg:h-7 xl:h-9'
+  const logoSize = 'aspect-[16/3] h-6 w-auto sm:h-9 lg:h-7 xl:h-9'
   const logo = <AnimatedLogo className={logoSize} />
   const drawerLogo = <AnimatedLogo className={logoSize} still />
 
@@ -253,7 +253,7 @@ export async function SiteFooter({ locale = 'en' }: { locale?: Locale }) {
               <img
                 src="/pakrimits-new-logo.svg"
                 alt="PakRemits"
-                width={185}
+                width={197}
                 height={36}
                 className="h-9 w-auto"
               />

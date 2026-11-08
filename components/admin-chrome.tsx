@@ -33,9 +33,9 @@ export function AdminHeader({
           {/* Below lg the sidebar is hidden, so the logo comes here. */}
           <Link href="/admin" className="shrink-0 no-underline lg:hidden" aria-label="Admin home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/pakrimits-new-logo.svg" alt="PakRemits" width={103} height={20} className="h-5 w-auto dark:hidden" />
+            <img src="/pakrimits-new-logo.svg" alt="PakRemits" width={109} height={20} className="h-5 w-auto dark:hidden" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/pakrimits-new-logo-dark.svg" alt="PakRemits" width={103} height={20} className="hidden h-5 w-auto dark:block" />
+            <img src="/pakrimits-new-logo-dark.svg" alt="PakRemits" width={109} height={20} className="hidden h-5 w-auto dark:block" />
           </Link>
 
           <div className="hidden min-w-0 lg:block">

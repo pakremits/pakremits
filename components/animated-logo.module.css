@@ -49,7 +49,7 @@
   animation-delay: calc(1.05s + var(--i) * 45ms);
 }
 
-/* 4. Gold dots drop onto the i's like coins */
+/* 4. The gold dot drops onto the i like a coin */
 .dot {
   fill: var(--pr-gold);
   opacity: 0;

@@ -72,7 +72,7 @@ ${input.facts
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" bgcolor="${C.canvas}" style="width:100%;background:${C.canvas}"><tr><td align="center" style="padding:32px 14px">
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" bgcolor="${C.surface}" style="width:100%;max-width:560px;background:${C.surface};border-radius:18px;overflow:hidden">
 <tr><td style="padding:22px 32px">
-<a href="${home}" style="display:inline-block;text-decoration:none"><img src="${home}/pakrimits-email-logo.png" width="160" height="32" alt="PakRemits" style="display:block;width:160px;height:32px;border:0;outline:none;text-decoration:none"></a>
+<a href="${home}" style="display:inline-block;text-decoration:none"><img src="${home}/pakrimits-email-logo.png" width="175" height="32" alt="PakRemits" style="display:block;width:175px;height:32px;border:0;outline:none;text-decoration:none"></a>
 </td></tr>
 <tr><td bgcolor="${C.brand}" style="padding:28px 32px 30px;background-color:${C.brand};background-image:linear-gradient(61deg,${C.brand} 0%,${C.brandMid} 100%)">
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 14px"><tr><td bgcolor="${C.tint}" style="background:${C.tint};border-radius:999px;padding:5px 12px;color:${C.brand};font-size:13px;line-height:18px;font-weight:700">${escapeHtml(input.label)}</td></tr></table>
