@@ -8,9 +8,9 @@ export function AdminSidebar() {
       <div className="flex h-[72px] shrink-0 items-center gap-2.5 border-b border-line px-6">
         <Link href="/admin" className="flex items-center gap-2.5 no-underline" aria-label="Admin home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/pakrimits-new-logo.svg" alt="PakRemits" width={103} height={20} className="h-5 w-auto dark:hidden" />
+          <img src="/pakrimits-new-logo.svg" alt="PakRemits" width={109} height={20} className="h-5 w-auto dark:hidden" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/pakrimits-new-logo-dark.svg" alt="PakRemits" width={103} height={20} className="hidden h-5 w-auto dark:block" />
+          <img src="/pakrimits-new-logo-dark.svg" alt="PakRemits" width={109} height={20} className="hidden h-5 w-auto dark:block" />
           <span className="rounded-full bg-icon-bg px-2 py-0.5 text-[11.5px] font-bold text-ok">Admin</span>
         </Link>
       </div>
